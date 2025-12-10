@@ -1,0 +1,56 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+*.log
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# SQLite databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Production env (keep template)
+.env.production
+
+# VSCode
+.vscode/
+
+# Backup files
+*.bak
+*.backup
+backups/
+
+# Test files
+TEST.md
+TEST_SUMMARY.md
+
+# Summary files (generated)
+PROJECT_SUMMARY.md

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>HUAS SCHEDULE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        popCyan: '#6AECE1',
+                        popTeal: '#26CCC2',
+                        popYellow: '#FFF57E',
+                        popOrange: '#FFB76C',
+                        popPurple: '#C084FC',
+                        popPink: '#F472B6',
+                        ink: '#134E4A',
+                    },
+                    boxShadow: {
+                        'hard': '4px 4px 0px 0px #134E4A', 
+                        'card': '2px 2px 0px 0px #134E4A',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        * { -webkit-tap-highlight-color: transparent; }
+        
+        /* 🔥 核心优化：移动端固定列 (Sticky Column) */
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 30; /* 保证在课程卡片之上 */
+            background-color: #F8FAFC; /* 必须有背景色，防止透视 */
+        }
+        /* 固定列右侧加个阴影，更有层次感 */
+        .sticky-shadow::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: -4px;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(to right, rgba(0,0,0,0.05), transparent);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-[#F0F4F8] text-ink min-h-[100dvh] flex flex-col items-center py-6 px-4 pb-10">
+
+    <!-- 头部 -->
+    <header class="mb-6 text-center w-full">
+        <h1 class="text-3xl font-black tracking-tighter text-popTeal italic">HUAS <span class="text-ink">SCHEDULE</span></h1>
+    </header>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+        <div class="animate-spin rounded-full h-10 w-10 border-4 border-popTeal border-t-popOrange mb-3"></div>
+        <div class="font-black bg-popYellow px-3 py-1 border border-ink shadow-hard text-xs">LOADING...</div>
+    </div>
+
+    <!-- 登录卡片 -->
+    <section id="loginCard" class="w-full max-w-sm bg-white border-2 border-ink rounded-xl shadow-hard p-5 mb-8">
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-xl font-black">LOGIN</h2>
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold text-slate-400">SYSTEM READY</span>
+                <div class="w-2.5 h-2.5 rounded-full bg-green-400 border border-ink animate-pulse"></div>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">学号</label>
+                <input type="text" id="username" 
+                    class="w-full text-base bg-slate-50 border-2 border-ink rounded-lg p-3 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal" placeholder="请输入学号">
+            </div>
+            <div>
+                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">密码</label>
+                <input type="password" id="password" 
+                    class="w-full text-base bg-slate-50 border-2 border-ink rounded-lg p-3 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal" placeholder="请输入密码">
+            </div>
+            <div>
+                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">验证码</label>
+                <div class="flex gap-2 h-[50px]">
+                    <input type="text" id="captcha" placeholder="ABCD" 
+                        class="flex-1 min-w-0 text-base bg-slate-50 border-2 border-ink rounded-lg p-3 font-bold uppercase focus:outline-none focus:border-popTeal focus:shadow-hard transition-all">
+                    
+                    <div class="w-28 border-2 border-ink rounded-lg bg-slate-200 cursor-pointer overflow-hidden relative group shrink-0 active:scale-95 transition-transform" onclick="initCaptcha()">
+                        <img id="captchaImg" class="w-full h-full object-fill hidden">
+                        <div id="captchaText" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400">点击刷新</div>
+                    </div>
+                </div>
+            </div>
+            <button onclick="handleLogin()" class="w-full bg-popTeal border-2 border-ink text-white font-black py-3 rounded-lg shadow-hard hover:translate-y-[-2px] hover:bg-popOrange transition-all active:translate-y-0 active:shadow-none mt-2">
+                登 录
+            </button>
+        </div>
+    </section>
+
+    <!-- 数据展示区域 -->
+    <section id="dataArea" class="hidden w-full max-w-4xl animate-pulse space-y-4">
+        
+        <!-- 顶部信息栏：个人 + 一卡通 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- 个人信息 -->
+            <div class="md:col-span-2 bg-white border-2 border-ink rounded-xl shadow-hard p-4 flex items-center gap-4 relative overflow-hidden">
+                <div class="w-14 h-14 bg-indigo-50 rounded-full border-2 border-ink flex items-center justify-center shrink-0 overflow-hidden">
+                    <img id="userAvatar" src="" alt="Avatar" class="w-full h-full object-cover mix-blend-multiply">
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="text-xl font-black text-ink truncate" id="uiName">--</div>
+                    <div class="flex flex-wrap gap-1 mt-1">
+                        <span class="px-1.5 py-0.5 bg-slate-100 border border-ink rounded text-[10px] font-bold font-mono" id="uiId">--</span>
+                        <span class="px-1.5 py-0.5 bg-popYellow/50 border border-ink rounded text-[10px] font-bold truncate max-w-[120px]" id="uiClass">--</span>
+                    </div>
+                </div>
+                <button onclick="handleLogout()" class="absolute top-0 right-0 p-3 text-[10px] font-bold text-slate-300 hover:text-red-500">退出</button>
+            </div>
+
+            <!-- 一卡通 (已修复未知状态) -->
+            <div class="bg-ink text-white border-2 border-ink rounded-xl shadow-hard p-4 flex flex-col justify-between relative overflow-hidden h-24 md:h-auto">
+                <div class="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+                <div class="flex justify-between items-start z-10">
+                    <span class="text-[10px] font-bold text-popCyan tracking-widest opacity-80">E-CARD</span>
+                    <!-- 状态标签 -->
+                    <span class="px-2 py-0.5 border border-popCyan/40 bg-popCyan/10 rounded-full text-[10px] font-bold text-popCyan" id="ecStatus">
+                        Checking...
+                    </span>
+                </div>
+                <div class="z-10 mt-1">
+                    <div class="text-3xl font-black tracking-tighter flex items-baseline gap-1">
+                        <span class="text-sm text-popOrange">¥</span>
+                        <span id="ecBalance">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 课程表 (移动端 Sticky 优化版) -->
+        <div class="w-full bg-white border-2 border-ink rounded-xl shadow-hard p-0 overflow-hidden flex flex-col">
+            <!-- 课表标题栏 -->
+            <div class="flex justify-between items-center p-4 border-b-2 border-slate-100">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-5 bg-popTeal border-2 border-ink -rotate-6 rounded-sm"></div>
+                    <h3 class="text-lg font-black tracking-tight" id="schWeek">--</h3>
+                </div>
+                <button onclick="loadAllData()" class="text-[10px] font-bold bg-slate-50 px-3 py-1.5 border border-slate-300 rounded hover:bg-white active:scale-95 transition-all">
+                    刷新
+                </button>
+            </div>
+
+            <!-- 滚动区域 -->
+            <div class="overflow-x-auto hide-scroll pb-2">
+                <!-- 
+                    移动端宽度设置为 160% (min-w-[160vw]) 强制横向滚动
+                    PC端则自适应 100% 
+                -->
+                <div class="min-w-[160vw] md:min-w-full" id="scheduleContainer">
+                    <!-- JS 生成内容 -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const API_BASE = ''; 
+        
+        let currentSessionId = '';
+        let globalToken = localStorage.getItem('huas_token') || '';
+
+        const COURSE_COLORS = [
+            'bg-popCyan', 'bg-popYellow', 'bg-popOrange', 'bg-popPurple', 
+            'bg-popPink', 'bg-[#A5F3FC]', 'bg-[#FDA4AF]'
+        ];
+
+        if (globalToken) {
+            loadAllData();
+        } else {
+            initCaptcha();
+        }
+
+        async function initCaptcha() {
+            setLoading(true);
+            try {
+                const res = await fetch(`${API_BASE}/auth/captcha`);
+                const json = await res.json();
+                if (json.code === 200) {
+                    currentSessionId = json.data.sessionId;
+                    const img = document.getElementById('captchaImg');
+                    img.src = 'data:image/png;base64,' + json.data.image;
+                    img.classList.remove('hidden');
+                    document.getElementById('captchaText').classList.add('hidden');
+                } else {
+                    alert('验证码获取失败: ' + json.msg);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function handleLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const c = document.getElementById('captcha').value;
+            if(!u || !p || !c) return alert('请填写完整');
+
+            setLoading(true);
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSessionId, username: u, password: p, code: c })
+                });
+                const json = await res.json();
+                if (json.code === 200) {
+                    globalToken = json.token;
+                    localStorage.setItem('huas_token', globalToken);
+                    loadAllData();
+                } else {
+                    alert('登录失败: ' + json.msg);
+                    initCaptcha();
+                }
+            } catch (e) {
+                alert('登录请求错误');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function loadAllData() {
+            if (!globalToken) return;
+            setLoading(true);
+            document.getElementById('loginCard').classList.add('hidden');
+            document.getElementById('dataArea').classList.remove('hidden');
+            document.getElementById('dataArea').classList.remove('animate-pulse');
+
+            const headers = { 'Authorization': globalToken };
+            try {
+                const [resUser, resEcard, resSch] = await Promise.all([
+                    fetch(`${API_BASE}/api/user`, { headers }),
+                    fetch(`${API_BASE}/api/ecard`, { headers }),
+                    fetch(`${API_BASE}/api/schedule`, { headers })
+                ]);
+
+                if ([resUser.status, resEcard.status, resSch.status].includes(401)) {
+                    throw new Error('SESSION_EXPIRED');
+                }
+
+                const dUser = await resUser.json();
+                const dEcard = await resEcard.json();
+                const dSch = await resSch.json();
+
+                renderUser(dUser.data);
+                renderEcard(dEcard.data);
+                renderSchedule(dSch.data);
+
+            } catch (e) {
+                if (e.message === 'SESSION_EXPIRED') {
+                    alert('登录已过期，请重新登录');
+                    handleLogout();
+                } else {
+                    console.error(e);
+                }
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function renderUser(data) {
+            if(!data) return;
+            document.getElementById('uiName').innerText = data.name;
+            document.getElementById('uiId').innerText = data.studentId;
+            document.getElementById('uiClass').innerText = data.className;
+            const seed = encodeURIComponent(data.name || 'Student');
+            document.getElementById('userAvatar').src = `https://api.dicebear.com/9.x/notionists/svg?seed=${seed}&backgroundColor=e9d5ff`;
+        }
+
+        // 🔥 修复：一卡通状态未知显示问题
+        function renderEcard(data) {
+            if(!data) return;
+            
+            // 修复未知状态：如果状态为空或包含"未知"，强制显示"正常"
+            let statusText = data.status;
+            if (!statusText || statusText.includes('未知')) {
+                statusText = '正常';
+            }
+            
+            // 修复金额：如果金额不存在，显示 0.00
+            const balanceText = (data.balance === undefined || data.balance === null) ? '0.00' : data.balance;
+
+            const elStatus = document.getElementById('ecStatus');
+            elStatus.innerText = statusText;
+            
+            // 状态颜色逻辑
+            if (statusText === '正常') {
+                elStatus.className = "px-2 py-0.5 border border-popCyan/40 bg-popCyan/10 rounded-full text-[10px] font-bold text-popCyan";
+            } else {
+                elStatus.className = "px-2 py-0.5 border border-red-400/40 bg-red-400/10 rounded-full text-[10px] font-bold text-red-400";
+            }
+
+            document.getElementById('ecBalance').innerText = balanceText;
+        }
+
+        // 🔥 移动端 Sticky 课表
+        function renderSchedule(data) {
+            if(!data) return;
+            document.getElementById('schWeek').innerText = data.week || 'Schedule';
+            
+            const container = document.getElementById('scheduleContainer');
+            const courseMap = {};
+            if (data.courses && Array.isArray(data.courses)) {
+                data.courses.forEach(c => {
+                    const match = c.section.match(/(\d+)/);
+                    if (!match) return;
+                    const startNode = parseInt(match[1]);
+                    const sectionIdx = Math.floor((startNode - 1) / 2);
+                    const dayIdx = c.day - 1;
+                    const key = `${dayIdx}_${sectionIdx}`;
+                    if (!courseMap[key]) courseMap[key] = [];
+                    courseMap[key].push(c);
+                });
+            }
+
+            // Grid 定义：第一列 45px (sticky), 后面 7 列平均分布
+            let html = `<div class="grid grid-cols-[45px_repeat(7,1fr)]">`;
+            
+            // 左上角空块 (Sticky)
+            html += `<div class="sticky-col sticky-shadow bg-[#F8FAFC] border-b border-r border-slate-100 z-40"></div>`;
+            
+            // 星期表头
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const todayColIdx = (new Date().getDay() + 6) % 7;
+            days.forEach((d, i) => {
+                const isToday = i === todayColIdx;
+                const bgClass = isToday ? 'text-popTeal bg-popTeal/10' : 'text-slate-400';
+                html += `<div class="text-center font-black text-[10px] py-3 border-b border-slate-100 ${bgClass}">${d}</div>`;
+            });
+
+            const sections = ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12'];
+            
+            for (let s = 0; s < 6; s++) {
+                // 左侧时间轴 (Sticky + Shadow)
+                html += `
+                    <div class="sticky-col sticky-shadow flex items-center justify-center font-bold text-slate-400 bg-[#F8FAFC] border-r border-b border-slate-100 text-[10px] z-30">
+                        ${sections[s]}
+                    </div>
+                `;
+                
+                // 课程格子
+                for (let d = 0; d < 7; d++) {
+                    const courses = courseMap[`${d}_${s}`];
+                    // 今天的列加一点微背景区分
+                    const colBg = d === todayColIdx ? 'bg-popTeal/5' : '';
+                    
+                    html += `<div class="p-1 border-b border-slate-100 border-r border-dashed border-slate-200 ${colBg} min-h-[100px] relative">`;
+                    
+                    if (courses && courses.length > 0) {
+                        html += `<div class="flex flex-col gap-1 h-full">`; 
+                        courses.forEach((course, idx) => {
+                             const colorIdx = (d + s + idx) % COURSE_COLORS.length;
+                             const bgClass = COURSE_COLORS[colorIdx];
+                             html += `
+                                <div class="course-card flex-1 ${bgClass} border-2 border-ink rounded-lg p-1.5 shadow-card cursor-pointer flex flex-col justify-between relative overflow-hidden group" title="${course.name}">
+                                    <div class="font-black text-[10px] text-ink leading-tight line-clamp-3 z-10 relative mb-1">
+                                        ${course.name}
+                                    </div>
+                                    <div class="flex justify-start z-10 relative">
+                                        <div class="inline-flex items-center bg-white/60 border border-ink/10 px-1 py-0.5 rounded-[4px] text-[8px] font-bold text-ink/80 backdrop-blur-sm max-w-full">
+                                            <span class="truncate">📍${course.location.replace('校本部', '')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += `</div>`;
+                    }
+                    html += `</div>`;
+                }
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('huas_token');
+            globalToken = '';
+            location.reload();
+        }
+
+        function setLoading(isLoading) {
+            const el = document.getElementById('loading');
+            el.classList.toggle('hidden', !isLoading);
+        }
+    </script>
+</body>
+</html>
