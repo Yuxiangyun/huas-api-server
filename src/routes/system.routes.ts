@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { statsRepo } from '../db/StatsRepo';
 import { performanceMonitor } from '../core/utils/PerformanceMonitor';
 import loggerInstance from '../core/utils/Logger';
+import { createAdminAuthMiddleware } from '../core/middleware/MiddlewareFactory';
 
 const app = new Hono();
 
@@ -51,10 +52,15 @@ app.get('/system/health', (c) => {
     });
 });
 
+// ========== 管理员权限保护的统计接口 ==========
+// 所有 /system/stats/* 路由需要管理员权限
+app.use('/system/stats/*', createAdminAuthMiddleware());
+
 /**
  * 系统统计接口
  * GET /system/stats
  * 返回完整的系统统计数据
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats', (c) => {
     try {
@@ -77,6 +83,7 @@ app.get('/system/stats', (c) => {
 /**
  * 用户统计接口
  * GET /system/stats/users
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats/users', (c) => {
     try {
@@ -97,6 +104,7 @@ app.get('/system/stats/users', (c) => {
 /**
  * 会话统计接口
  * GET /system/stats/sessions
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats/sessions', (c) => {
     try {
@@ -117,6 +125,7 @@ app.get('/system/stats/sessions', (c) => {
 /**
  * 缓存统计接口
  * GET /system/stats/cache
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats/cache', (c) => {
     try {
@@ -137,6 +146,7 @@ app.get('/system/stats/cache', (c) => {
 /**
  * 活跃用户排行榜
  * GET /system/stats/active-users?limit=10
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats/active-users', (c) => {
     try {

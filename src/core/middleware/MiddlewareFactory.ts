@@ -3,7 +3,7 @@
  * 提供可配置的中间件生成器，方便复用和扩展
  */
 import type { Context, Next } from 'hono';
-import { checkRateLimit, isValidTokenFormat, maskToken, getClientIP } from '../security';
+import { checkRateLimit, isValidTokenFormat, maskToken, getClientIP, maskStudentId } from '../security';
 import { sessionRepo } from '../../db/SessionRepo';
 import { performanceMonitor } from '../utils/PerformanceMonitor';
 import loggerInstance from '../utils/Logger';
@@ -181,5 +181,72 @@ export function createLoggerMiddleware(options?: {
         }
         
         loggerInstance.debug("请求完成", responseLog);
+    };
+}
+
+/**
+ * 创建管理员认证中间件
+ * 验证用户是否为系统管理员
+ * 
+ * @returns 管理员认证中间件
+ */
+export function createAdminAuthMiddleware() {
+    // 管理员学号白名单
+    const ADMIN_STUDENT_IDS = new Set<string>(['202412040130']);
+
+    return async (c: Context, next: Next) => {
+        const token = c.req.header('Authorization');
+        const clientIP = c.get('clientIP');
+
+        // Token 存在性检查
+        if (!token) {
+            loggerInstance.warn("管理员接口未授权访问尝试", { path: c.req.path, ip: clientIP });
+            return c.json({ code: 401, msg: "未授权" }, 401 as any);
+        }
+
+        // Token 格式验证
+        if (!isValidTokenFormat(token)) {
+            loggerInstance.warn("管理员接口收到无效 Token 格式", { token: maskToken(token), ip: clientIP });
+            return c.json({ code: 401, msg: "Token 格式无效" }, 401 as any);
+        }
+
+        // 会话验证
+        const session = sessionRepo.get(token);
+        if (!session || !session.student_id) {
+            loggerInstance.warn("管理员接口会话不存在或未绑定用户", { token: maskToken(token), ip: clientIP });
+            return c.json({ code: 401, msg: "会话已过期或未登录" }, 401 as any);
+        }
+
+        const studentId = session.student_id as string;
+
+        // 管理员身份校验
+        if (!ADMIN_STUDENT_IDS.has(studentId)) {
+            loggerInstance.warn("非管理员访问管理员接口被拒绝", { 
+                studentId: maskStudentId(studentId), 
+                ip: clientIP, 
+                path: c.req.path 
+            });
+            return c.json({ code: 403, msg: "仅管理员可访问" }, 403 as any);
+        }
+
+        // 管理员接口速率限制
+        const rateLimitKey = `admin:${studentId}`;
+        if (!checkRateLimit(rateLimitKey, 100)) { // 管理员限流稍宽松
+            loggerInstance.warn("管理员接口速率限制触发", { 
+                studentId: maskStudentId(studentId), 
+                ip: clientIP, 
+                path: c.req.path 
+            });
+            return c.json({ code: 429, msg: "请求过于频繁，请稍后再试" }, 429 as any);
+        }
+
+        // 在上下文里标记管理员身份
+        c.set('userId', studentId);
+        loggerInstance.info("管理员访问系统接口", { 
+            studentId: maskStudentId(studentId), 
+            path: c.req.path 
+        });
+        
+        await next();
     };
 }
