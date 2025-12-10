@@ -59,8 +59,8 @@ export const LOG_CONFIG = {
 
 // 业务配置
 export const BUSINESS_CONFIG = {
-    /** 课表缓存 TTL (秒) */
-    SCHEDULE_TTL: 3600,
+    /** 课表缓存 TTL (秒) - 7天，避免频繁过期 */
+    SCHEDULE_TTL: 7 * 24 * 3600,
     
     /** 用户信息缓存 TTL (秒) */
     USER_INFO_TTL: 2592000,

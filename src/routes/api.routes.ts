@@ -21,14 +21,16 @@ export function registerApiRoutes<E extends { Variables: { userId: string; clien
     
     // 获取课程表
     app.get('/api/schedule', createHandler(async (c) => {
+        const refresh = c.req.query('refresh') === 'true';
         const service = new StudentService(c.get('userId'));
-        return service.getSchedule();
+        return service.getSchedule(refresh);
     }));
     
     // 获取用户信息
     app.get('/api/user', createHandler(async (c) => {
+        const refresh = c.req.query('refresh') === 'true';
         const service = new StudentService(c.get('userId'));
-        return service.getUserInfo();
+        return service.getUserInfo(refresh);
     }));
     
     // 获取一卡通余额

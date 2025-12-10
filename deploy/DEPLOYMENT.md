@@ -357,3 +357,16 @@ sudo ./deploy/deploy.sh
 2. Bun 版本：`bun --version`
 3. 服务日志：`sudo journalctl -u huas-api -n 100`
 4. 错误截图或完整错误信息
+
+# 1. SSH 登录服务器
+ssh <你的服务器>
+
+# 2. 进入项目目录
+cd ~/huas-api
+
+# 3. 拉取最新代码
+git fetch origin
+git reset --hard origin/main
+
+# 4. 重新部署
+sudo ./deploy/deploy.shs
