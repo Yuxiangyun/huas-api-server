@@ -2,8 +2,9 @@
 
 ## 基础信息
 
-- **Base URL**: `http://localhost:3000`
-- **环境**: 开发环境（生产环境请使用实际域名）
+- **Base URL**: 
+  - 开发环境：`http://localhost:3000`
+  - 生产环境：`http://localhost:12103`（或实际域名）
 - **协议**: HTTP/HTTPS
 - **数据格式**: JSON
 

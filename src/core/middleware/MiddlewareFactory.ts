@@ -7,6 +7,7 @@ import { checkRateLimit, isValidTokenFormat, maskToken, getClientIP, maskStudent
 import { sessionRepo } from '../../db/SessionRepo';
 import { performanceMonitor } from '../utils/PerformanceMonitor';
 import loggerInstance from '../utils/Logger';
+import { SECURITY_CONFIG } from '../../config';
 
 /**
  * 创建性能监控中间件
@@ -191,8 +192,8 @@ export function createLoggerMiddleware(options?: {
  * @returns 管理员认证中间件
  */
 export function createAdminAuthMiddleware() {
-    // 管理员学号白名单
-    const ADMIN_STUDENT_IDS = new Set<string>(['202412040130']);
+    // 管理员学号白名单（从配置读取）
+    const ADMIN_STUDENT_IDS = new Set<string>(SECURITY_CONFIG.ADMIN_STUDENT_IDS);
 
     return async (c: Context, next: Next) => {
         const token = c.req.header('Authorization');

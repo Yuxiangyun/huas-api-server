@@ -85,11 +85,11 @@
   ```
 - [ ] 健康检查通过
   ```bash
-  curl http://localhost:3000/health
+  curl http://localhost:12103/health
   ```
 - [ ] 性能指标正常
   ```bash
-  curl http://localhost:3000/metrics
+  curl http://localhost:12103/metrics
   ```
 - [ ] 日志正常输出
   ```bash
@@ -189,12 +189,7 @@
 
 5. **验证回滚成功**
    ```bash
-   curl http://localhost:3000/health
+   curl http://localhost:12103/health
    ```
 
-## 签名确认
 
-- [ ] 开发负责人已审核：__________ 日期：______
-- [ ] 运维负责人已确认：__________ 日期：______
-- [ ] 安全审查已通过：__________ 日期：______
-- [ ] 生产部署已完成：__________ 日期：______

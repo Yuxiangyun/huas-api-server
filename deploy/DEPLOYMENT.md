@@ -131,11 +131,11 @@ sudo systemctl status huas-api
 # 查看日志
 sudo journalctl -u huas-api -f
 
-# 健康检查
-curl http://localhost:3000/health
+# 健康检查（生产环境默认端口 12103）
+curl http://localhost:12103/health
 
 # 性能指标
-curl http://localhost:3000/metrics
+curl http://localhost:12103/metrics
 ```
 
 ## Nginx 反向代理配置
@@ -174,9 +174,9 @@ server {
     access_log /var/log/nginx/huas-api.access.log;
     error_log /var/log/nginx/huas-api.error.log;
 
-    # 反向代理
+    # 反向代理（生产环境默认端口 12103）
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:12103;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -196,7 +196,7 @@ server {
     limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
     location /api/ {
         limit_req zone=api burst=20;
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:12103;
     }
 }
 ```
@@ -271,8 +271,8 @@ top -p $(pgrep -f huas-api)
 # 查看内存使用
 ps aux | grep huas-api
 
-# 查看端口监听
-sudo netstat -tulpn | grep 3000
+# 查看端口监听（生产环境默认 12103）
+sudo netstat -tulpn | grep 12103
 ```
 
 ## 更新部署
@@ -293,7 +293,7 @@ sudo ./deploy/deploy.sh
 1. 检查日志：`sudo journalctl -u huas-api -n 50`
 2. 检查配置文件：`cat /opt/huas-api/.env.production`
 3. 检查文件权限：`ls -la /opt/huas-api`
-4. 检查端口占用：`sudo lsof -i :3000`
+4. 检查端口占用：`sudo lsof -i :12103`
 
 ### 数据库错误
 
@@ -303,7 +303,7 @@ sudo ./deploy/deploy.sh
 
 ### 性能问题
 
-1. 查看性能指标：`curl http://localhost:3000/metrics`
+1. 查看性能指标：`curl http://localhost:12103/metrics`
 2. 检查内存使用：`free -h`
 3. 检查磁盘 IO：`iostat -x 1`
 4. 调整速率限制配置
