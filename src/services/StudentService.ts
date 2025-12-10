@@ -36,8 +36,16 @@ export class StudentService extends BaseService {
                 execution: savedSession.execution || undefined,
                 updatedAt: savedSession.updated_at
             };
-            this.client = new HuasClient(token, userSession);
-            loggerInstance.debug("从数据库恢复会话状态", { token: maskToken(token) });
+            
+            // 使用数据库中的 student_id 作为用户标识（学号）
+            // 如果会话未绑定用户（未登录），则 userId 将保持为 token（后续会被判断为未登录）
+            const userId = savedSession.student_id || token;
+            this.client = new HuasClient(userId, userSession);
+            
+            loggerInstance.debug("从数据库恢复会话状态", { 
+                token: maskToken(token),
+                hasStudentId: !!savedSession.student_id 
+            });
         } else {
             this.client = new HuasClient(token);
         }
@@ -45,14 +53,20 @@ export class StudentService extends BaseService {
 
     /**
      * 实现基类抽象方法：获取用户标识
+     * 返回学号或 undefined（未登录时）
      */
     protected getUserIdentifier(): string | undefined {
-        return this.client.userId;
+        const session = this.sessionRepo.get(this.token);
+        return session?.student_id || undefined;
     }
 
-    /** 获取学号（对外接口） */
+    /** 
+     * 获取学号（对外接口）
+     * @returns 学号，未登录时返回 undefined
+     */
     get studentId(): string | undefined {
-        return this.client.userId;
+        const session = this.sessionRepo.get(this.token);
+        return session?.student_id || undefined;
     }
 
     // ========== 业务方法 ==========
@@ -136,22 +150,21 @@ export class StudentService extends BaseService {
             
             if (success) {
                 const sessionRepoInstance = new SessionRepo();
-                const studentId = this.client.userId;
-                
-                if (studentId) {
-                    const currentSession = this.client.exportState();
-                    sessionRepoInstance.bindUser(
-                        this.token, 
-                        studentId, 
-                        currentSession.cookies, 
-                        this.client.portalToken || ''
-                    );
-                    loggerInstance.info("登录成功", { studentId: maskStudentId(studentId) });
-                    return true;
-                } else {
-                    loggerInstance.error("登录成功但无法获取学号");
-                    return false;
-                }
+                // 登录账号本身就是学号，作为系统内的唯一用户标识
+                const studentId = username;
+                // 登录成功后，将客户端内的 userId 统一更新为学号
+                // 后续缓存键、日志与统计统一以学号为维度
+                this.client.userId = studentId;
+
+                const currentSession = this.client.exportState();
+                sessionRepoInstance.bindUser(
+                    this.token, 
+                    studentId, 
+                    currentSession.cookies, 
+                    this.client.portalToken || ''
+                );
+                loggerInstance.info("登录成功", { studentId: maskStudentId(studentId) });
+                return true;
             }
             
             loggerInstance.warn("登录验证失败", { username: maskStudentId(username) });

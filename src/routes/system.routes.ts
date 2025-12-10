@@ -4,9 +4,37 @@
  */
 import { Hono } from 'hono';
 import { statsRepo } from '../db/StatsRepo';
+import { performanceMonitor } from '../core/utils/PerformanceMonitor';
 import loggerInstance from '../core/utils/Logger';
 
 const app = new Hono();
+
+// ========== 根路径路由（用于负载均衡器/监控） ==========
+
+/**
+ * 健康检查接口
+ * GET /health
+ * 用于负载均衡器和监控系统
+ */
+app.get('/health', (c) => {
+    return c.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+/**
+ * 性能指标接口
+ * GET /metrics
+ * 返回系统性能指标
+ */
+app.get('/metrics', (c) => {
+    const metrics = performanceMonitor.getMetrics();
+    return c.json(metrics);
+});
+
+// ========== /system/* 路由 ==========
 
 /**
  * 健康检查接口
