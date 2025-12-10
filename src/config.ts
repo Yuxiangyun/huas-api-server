@@ -37,6 +37,9 @@ export const SECURITY_CONFIG = {
     
     /** 速率限制时间窗口 (毫秒) */
     RATE_LIMIT_WINDOW: 60 * 1000,
+    
+    /** 管理员学号白名单（逗号分隔）*/
+    ADMIN_STUDENT_IDS: (process.env.ADMIN_STUDENT_IDS || '202412040130').split(',').map(id => id.trim()),
 };
 
 // 日志配置

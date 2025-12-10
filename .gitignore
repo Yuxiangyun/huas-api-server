@@ -54,3 +54,15 @@ TEST_SUMMARY.md
 
 # Summary files (generated)
 PROJECT_SUMMARY.md
+
+# 临时脚本文件（已创建但未使用）
+scripts/force-update.sh
+scripts/quick-deploy.sh
+scripts/server-update.sh
+
+# IDE 配置
+.cursor/
+.idea/
+
+# 前端静态文件（如果是纯 API 项目）
+index.html

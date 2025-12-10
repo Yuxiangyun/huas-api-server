@@ -43,7 +43,7 @@ bun install
 bun run dev
 ```
 
-服务将在 `http://localhost:3000` 启动
+服务将在 `http://localhost:3000` 启动（开发模式）
 
 ### 生产模式
 
@@ -157,6 +157,8 @@ huas-api/
 
 ```bash
 # 服务器配置
+# 开发环境端口：3000
+# 生产环境端口：12103
 PORT=3000
 NODE_ENV=production
 CORS_ORIGINS=https://yourdomain.com
@@ -183,26 +185,34 @@ API_RATE_LIMIT=60
 1. 首次安装
 
 ```bash
-sudo ./scripts/deploy.sh install
+# 首次安装
+sudo ./deploy/deploy.sh
 ```
 
 2. 部署代码
 
 ```bash
-sudo ./scripts/deploy.sh deploy
+sudo ./deploy/deploy.sh
 ```
 
 3. 启动服务
 
 ```bash
-sudo ./scripts/deploy.sh start
+# 查看服务状态
+sudo systemctl status huas-api
+
+# 查看日志
+sudo journalctl -u huas-api -f
 ```
 
 4. 查看状态
 
 ```bash
-sudo ./scripts/deploy.sh status
-sudo ./scripts/deploy.sh logs
+# 健康检查（生产环境）
+curl http://localhost:12103/health
+
+# 性能指标（生产环境）
+curl http://localhost:12103/metrics
 ```
 
 ### 手动部署
@@ -291,7 +301,10 @@ sudo systemctl status huas-api
 sudo journalctl -u huas-api -n 50
 
 # 检查端口占用
+# 开发环境
 lsof -i :3000
+# 生产环境
+lsof -i :12103
 ```
 
 ### 数据库锁定

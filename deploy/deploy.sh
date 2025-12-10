@@ -59,7 +59,11 @@ bun install --production
 # 4. 复制环境配置
 if [ ! -f "${APP_DIR}/.env.production" ]; then
     log_warn ".env.production 不存在，从示例文件创建"
-    cp "${APP_DIR}/.env.example" "${APP_DIR}/.env.production"
+    if [ -f "${APP_DIR}/.env.production.example" ]; then
+        cp "${APP_DIR}/.env.production.example" "${APP_DIR}/.env.production"
+    else
+        cp "${APP_DIR}/.env.example" "${APP_DIR}/.env.production"
+    fi
     log_warn "请编辑 ${APP_DIR}/.env.production 配置生产环境参数"
 fi
 
@@ -97,7 +101,7 @@ echo "  查看日志: journalctl -u ${APP_NAME} -f"
 echo "  重启服务: systemctl restart ${APP_NAME}"
 echo "  查看状态: systemctl status ${APP_NAME}"
 echo "  停止服务: systemctl stop ${APP_NAME}"
-echo "  健康检查: curl http://localhost:3000/health"
-echo "  性能指标: curl http://localhost:3000/metrics"
+echo "  健康检查: curl http://localhost:12103/health"
+echo "  性能指标: curl http://localhost:12103/metrics"
 
 log_info "部署完成！"
