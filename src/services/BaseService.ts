@@ -18,6 +18,8 @@ export interface FetchOptions {
     forceRefresh?: boolean;
     /** 缓存 TTL（秒） */
     ttl?: number;
+    /** 是否禁用缓存读写 */
+    disableCache?: boolean;
     /** 数据类型标识 */
     type: string;
 }
@@ -80,7 +82,7 @@ export abstract class BaseService {
         fetcher: () => Promise<TRaw>,
         parser: DataParser<TRaw, TData>
     ): Promise<FetchResult<TData>> {
-        const { forceRefresh = false, ttl = 0, type } = options;
+        const { forceRefresh = false, ttl = 0, type, disableCache = false } = options;
         const userId = this.getUserIdentifier();
         
         // 验证会话
@@ -91,7 +93,7 @@ export abstract class BaseService {
         }
         
         // 尝试读取缓存
-        if (!forceRefresh && ttl > 0) {
+        if (!disableCache && !forceRefresh && ttl > 0) {
             const cached = this.cacheRepo.get<TData>(userId, type, ttl);
             if (cached) {
                 loggerInstance.debug("缓存命中", { type, userId: userId.substring(0, 8) });
@@ -100,19 +102,23 @@ export abstract class BaseService {
         }
         
         // 从网络获取
-        return await this.fetchFromNetwork(userId, type, fetcher, parser);
+        return await this.fetchFromNetwork(userId, type, ttl, disableCache, fetcher, parser);
     }
     
     /**
      * 从网络获取数据
      * @param userId 用户标识
      * @param type 数据类型
+     * @param ttl 缓存 TTL
+     * @param disableCache 是否禁用缓存
      * @param fetcher 网络获取函数
      * @param parser 数据解析器
      */
     private async fetchFromNetwork<TRaw, TData>(
         userId: string,
         type: string,
+        ttl: number,
+        disableCache: boolean,
         fetcher: () => Promise<TRaw>,
         parser: DataParser<TRaw, TData>
     ): Promise<FetchResult<TData>> {
@@ -126,8 +132,10 @@ export abstract class BaseService {
                 throw new Error(`数据解析失败: ${type}`);
             }
             
-            // 写入缓存
-            this.cacheRepo.set(userId, type, data);
+            // 写入缓存（禁用或 ttl<=0 时不写）
+            if (!disableCache && ttl > 0) {
+                this.cacheRepo.set(userId, type, data);
+            }
             
             return { data, source: 'network' };
         } catch (e: any) {

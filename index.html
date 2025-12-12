@@ -128,18 +128,18 @@
             </div>
 
             <!-- 一卡通 -->
-            <div class="bg-ink text-white border-2 border-ink rounded-xl shadow-hard p-4 flex flex-col justify-between relative overflow-hidden">
-                <div class="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+            <div class="text-white border-2 border-transparent rounded-xl shadow-hard p-4 flex flex-col justify-between relative overflow-hidden" style="background: radial-gradient(circle at 20% 20%, #1f7a8c 0%, #0f3d3e 55%, #0b2b2c 100%);">
+                <div class="absolute -right-6 -top-6 w-28 h-28 bg-white/10 rounded-full blur-2xl"></div>
                 <div class="flex justify-between items-start z-10">
-                    <span class="text-[10px] font-bold text-popCyan tracking-widest opacity-80">E-CARD</span>
-                    <span class="px-2 py-0.5 border border-popCyan/40 bg-popCyan/10 rounded-full text-[10px] font-bold text-popCyan" id="ecStatus">--</span>
+                    <span class="text-[10px] font-bold tracking-widest opacity-80 text-[#9ee0ff]">E-CARD</span>
+                    <span class="px-2 py-0.5 border border-[#9ee0ff]/50 bg-[#9ee0ff]/15 rounded-full text-[10px] font-bold text-[#9ee0ff]" id="ecStatus">--</span>
                 </div>
                 <div class="z-10 mt-1 flex justify-between items-end">
                     <div class="text-3xl font-black tracking-tighter flex items-baseline gap-1">
-                        <span class="text-sm text-popOrange">¥</span>
+                        <span class="text-sm text-[#ffd166]">¥</span>
                         <span id="ecBalance">--</span>
                     </div>
-                    <button onclick="loadEcard(true)" class="text-[10px] font-bold bg-white/10 px-2 py-1 border border-white/30 rounded hover:bg-white/20 active:scale-95 transition-all">
+                    <button onclick="loadEcard(true)" class="text-[10px] font-bold px-3 py-1.5 rounded-md border border-white/30 bg-white/10 hover:bg-white/20 active:scale-95 transition-all">
                         刷新一卡通
                     </button>
                 </div>
@@ -169,7 +169,7 @@
                 <button class="flex items-center gap-2" onclick="togglePanel('grades')">
                     <div class="w-2 h-5 bg-popOrange border-2 border-ink -rotate-6 rounded-sm"></div>
                     <h3 class="text-lg font-black tracking-tight">成绩单</h3>
-                    <span id="gradeSource" class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 border border-slate-200 rounded text-slate-500">--</span>
+                    <span id="gradeSource" class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 border border-slate-200 rounded text-slate-500 hidden"></span>
                 </button>
                 <button onclick="refreshGradesButton()" class="text-[10px] font-bold bg-slate-50 px-3 py-1.5 border border-slate-300 rounded hover:bg-white active:scale-95 transition-all">
                     刷新成绩
@@ -402,8 +402,9 @@
             document.getElementById('schWeek').innerText = data.week || 'Schedule';
             
             const container = document.getElementById('scheduleContainer');
-            const leftColWidth = 60;
-            const dayMinWidth = 110;
+            const isMobile = window.innerWidth < 768;
+            const leftColWidth = isMobile ? 50 : 60;
+            const dayMinWidth = isMobile ? 90 : 110;
             container.style.minWidth = `${leftColWidth + 7 * dayMinWidth}px`;
             const courseMap = {};
             if (data.courses && Array.isArray(data.courses)) {
@@ -451,7 +452,7 @@
                     // 今天的列加一点微背景区分
                     const colBg = d === todayColIdx ? 'bg-popTeal/5' : '';
                     
-                    html += `<div class="p-1 border-b border-slate-100 border-r border-dashed border-slate-200 ${colBg} min-h-[100px] relative" data-day="${d}">`;
+                    html += `<div class="p-1 border-b border-slate-100 border-r border-dashed border-slate-200 ${colBg} min-h-[90px] relative" data-day="${d}">`;
                     
                     if (courses && courses.length > 0) {
                         html += `<div class="flex flex-col gap-1 h-full">`; 
@@ -491,6 +492,9 @@
                 });
                 if (res.status === 401) throw new Error('SESSION_EXPIRED');
                 const json = await res.json();
+                if (json.code && json.code !== 200) {
+                    throw new Error(json.msg || '成绩获取失败');
+                }
                 renderGrades(json.data);
                 panelLoaded.grades = true;
             } catch (e) {
@@ -498,7 +502,7 @@
                     alert('登录已过期，请重新登录');
                     handleLogout();
                 } else {
-                    alert('成绩获取失败');
+                    alert(e.message || '成绩获取失败');
                     console.error(e);
                 }
             } finally {
@@ -513,11 +517,23 @@
             document.getElementById('gCredits').innerText = summary.totalCredits ?? '--';
             document.getElementById('gGpa').innerText = summary.averageGpa ?? '--';
             document.getElementById('gAvg').innerText = summary.averageScore ?? '--';
-            document.getElementById('gradeSource').innerText = data._source ? data._source.toUpperCase() : '--';
+            const sourceEl = document.getElementById('gradeSource');
+            if (data._source) {
+                sourceEl.innerText = data._source.toUpperCase();
+                sourceEl.classList.remove('hidden');
+            } else {
+                sourceEl.innerText = '';
+                sourceEl.classList.add('hidden');
+            }
 
             const list = document.getElementById('gradeList');
             list.innerHTML = '';
             const items = data.items || [];
+
+            if (!items.length) {
+                list.innerHTML = `<div class="text-center text-slate-400 text-sm py-6">暂无成绩数据</div>`;
+                return;
+            }
 
             // 按学期分组并按时间倒序
             const groupMap = {};
@@ -548,6 +564,7 @@
                         ${term}
                     </div>
                 `;
+
                 groupMap[term].forEach(item => {
                     const passTag = item.pass === null ? '' : item.pass ? 'text-popTeal' : 'text-red-500';
                     const scoreText = item.score !== null ? item.score : item.scoreText || '--';
@@ -560,7 +577,7 @@
                         <div class="p-3 border border-slate-200 rounded-xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="flex-1 min-w-0">
-                                    <div class="text-[12px] text-slate-500 font-bold">${item.term}</div>
+                                    <div class="text-[12px] text-slate-500 font-bold">${item.term || ''}</div>
                                     <div class="text-base font-black text-ink leading-tight mt-1 line-clamp-2">${item.courseName}</div>
                                     <div class="text-[11px] text-slate-400 font-mono mt-0.5">${item.courseCode || '--'}</div>
                                 </div>
