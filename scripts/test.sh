@@ -21,7 +21,10 @@ TEST_TYPE="${1:-all}"
 case "$TEST_TYPE" in
     "all")
         echo -e "${YELLOW}运行所有测试...${NC}"
-        bun test src/test/
+        echo -e "${YELLOW}注意: 将跳过 E2E 测试（需要服务器运行）${NC}"
+        echo -e "${YELLOW}请使用 './scripts/test.sh e2e' 单独运行 E2E 测试${NC}"
+        echo ""
+        bun test src/test/unit/ src/test/integration/ src/test/security/ src/test/performance/
         ;;
     
     "unit")
@@ -36,7 +39,17 @@ case "$TEST_TYPE" in
     
     "e2e")
         echo -e "${YELLOW}运行 E2E 测试...${NC}"
-        bun test src/test/e2e/
+        echo -e "${YELLOW}注意: E2E 测试需要服务器运行在 http://localhost:3000${NC}"
+        echo -e "${YELLOW}请先运行: bun run dev${NC}"
+        echo ""
+        read -p "服务器是否已启动？(y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            bun test src/test/e2e/
+        else
+            echo -e "${RED}已取消 E2E 测试${NC}"
+            exit 1
+        fi
         ;;
     
     "security")
@@ -64,6 +77,16 @@ case "$TEST_TYPE" in
         bun test --no-color src/test/
         ;;
     
+    "quick")
+        echo -e "${YELLOW}快速测试：仅运行单元测试和集成测试...${NC}"
+        bun test src/test/unit/ src/test/integration/
+        ;;
+    
+    "smoke")
+        echo -e "${YELLOW}烟雾测试：运行关键接口测试...${NC}"
+        bun test src/test/e2e/auth-captcha.test.ts src/test/e2e/auth-login.test.ts src/test/e2e/system-health.test.ts
+        ;;
+    
     *)
         echo -e "${RED}未知的测试类型: $TEST_TYPE${NC}"
         echo ""
@@ -79,6 +102,8 @@ case "$TEST_TYPE" in
         echo "  coverage     - 测试覆盖率"
         echo "  watch        - 监听模式"
         echo "  ci           - CI 模式"
+        echo "  quick        - 快速测试（单元+集成）"
+        echo "  smoke        - 烟雾测试（关键接口）"
         exit 1
         ;;
 esac

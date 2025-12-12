@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>学生个人课表 - 教务系统</title>
+</head>
+<body>
+<script>
+// 真实课表页面会包含周次信息
+var li_showWeek = '2024-2025学年第一学期第15周';
+var currentWeek = 15;
+var semesterStartDate = '2024-09-01';
+</script>
+
+<div class="container">
+    <h2>我的课表</h2>
+    <table class="kb_table" border="1">
+        <thead>
+            <tr>
+                <th>节次/星期</th>
+                <th>星期一</th>
+                <th>星期二</th>
+                <th>星期三</th>
+                <th>星期四</th>
+                <th>星期五</th>
+                <th>星期六</th>
+                <th>星期日</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- 第1-2节 -->
+            <tr>
+                <td class="section-label">第1节<br/>08:00-08:45<br/><br/>第2节<br/>08:50-09:35</td>
+                <td></td>
+                <td>
+                    <div class="kb_content">
+                        <p title="课程名称：高等数学（上）<br/>上课地点：教学楼A-301<br/>教师：张教授<br/>上课时间：1-16周">
+                            <span class="course-name">高等数学（上）</span><br/>
+                            <span class="course-teacher">张教授</span><br/>
+                            <span class="course-location">教学楼A-301</span><br/>
+                            <span class="course-weeks">1-16周</span>
+                        </p>
+                    </div>
+                </td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            
+            <!-- 第3-4节 -->
+            <tr>
+                <td class="section-label">第3节<br/>10:05-10:50<br/><br/>第4节<br/>10:55-11:40</td>
+                <td></td>
+                <td></td>
+                <td>
+                    <div class="kb_content">
+                        <p title="课程名称：大学英语<br/>上课地点：外语楼B-201<br/>教师：李老师<br/>上课时间：1-18周(单周)">
+                            <span class="course-name">大学英语</span><br/>
+                            <span class="course-teacher">李老师</span><br/>
+                            <span class="course-location">外语楼B-201</span><br/>
+                            <span class="course-weeks">1-18周(单周)</span>
+                        </p>
+                    </div>
+                </td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            
+            <!-- 第5-6节 -->
+            <tr>
+                <td class="section-label">第5节<br/>13:30-14:15<br/><br/>第6节<br/>14:20-15:05</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>
+                    <div class="kb_content">
+                        <p title="课程名称：数据结构与算法<br/>上课地点：实验楼303<br/>教师：王副教授<br/>上课时间：1-16周">
+                            <span class="course-name">数据结构与算法</span><br/>
+                            <span class="course-teacher">王副教授</span><br/>
+                            <span class="course-location">实验楼303</span><br/>
+                            <span class="course-weeks">1-16周</span>
+                        </p>
+                    </div>
+                </td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            
+            <!-- 第7-8节 -->
+            <tr>
+                <td class="section-label">第7节<br/>15:25-16:10<br/><br/>第8节<br/>16:15-17:00</td>
+                <td>
+                    <div class="kb_content">
+                        <p title="课程名称：计算机组成原理<br/>上课地点：教学楼C-105<br/>教师：赵教授<br/>上课时间：1-16周">
+                            <span class="course-name">计算机组成原理</span><br/>
+                            <span class="course-teacher">赵教授</span><br/>
+                            <span class="course-location">教学楼C-105</span><br/>
+                            <span class="course-weeks">1-16周</span>
+                        </p>
+                    </div>
+                </td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>
+                    <div class="kb_content">
+                        <p title="课程名称：大学物理实验<br/>上课地点：物理实验室A<br/>教师：钱老师<br/>上课时间：1-16周(双周)">
+                            <span class="course-name">大学物理实验</span><br/>
+                            <span class="course-teacher">钱老师</span><br/>
+                            <span class="course-location">物理实验室A</span><br/>
+                            <span class="course-weeks">1-16周(双周)</span>
+                        </p>
+                    </div>
+                </td>
+                <td></td>
+                <td></td>
+            </tr>
+            
+            <!-- 第9-10节 -->
+            <tr>
+                <td class="section-label">第9节<br/>18:30-19:15<br/><br/>第10节<br/>19:20-20:05</td>
+                <td></td>
+                <td></td>
+                <td>
+                    <div class="kb_content">
+                        <p title="课程名称：思想道德与法治<br/>上课地点：阶梯教室1<br/>教师：孙教授<br/>上课时间：1-16周">
+                            <span class="course-name">思想道德与法治</span><br/>
+                            <span class="course-teacher">孙教授</span><br/>
+                            <span class="course-location">阶梯教室1</span><br/>
+                            <span class="course-weeks">1-16周</span>
+                        </p>
+                    </div>
+                </td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+// 真实课表页面的一些额外脚本
+function highlightCurrentWeek() {
+    // 高亮显示当前周
+    console.log('当前是第' + currentWeek + '周');
+}
+</script>
+
+</body>
+</html>

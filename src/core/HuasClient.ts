@@ -88,6 +88,10 @@ export class HuasClient {
         return await this.jwApi.getScheduleRaw();
     }
     
+    async fetchGradesRaw() {
+        return await this.jwApi.getGradesRaw();
+    }
+    
     async fetchUserInfoRaw() {
         if (!this.portalToken) throw new Error("Token Missing");
         return await this.userApi.getUserInfoRaw(this.portalToken);

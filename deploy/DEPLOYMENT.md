@@ -358,15 +358,24 @@ sudo ./deploy/deploy.sh
 3. 服务日志：`sudo journalctl -u huas-api -n 100`
 4. 错误截图或完整错误信息
 
-# 1. SSH 登录服务器
-ssh <你的服务器>
 
-# 2. 进入项目目录
-cd ~/huas-api
 
-# 3. 拉取最新代码
+拉取最新代码（强制对齐远端）
+bash
 git fetch origin
 git reset --hard origin/main
-
-# 4. 重新部署
-sudo ./deploy/deploy.shs
+这样可以保证服务器代码和远端 main 分支完全一致。
+四、更新依赖（如有变更）
+在同一个目录下执行：
+bash
+bun install --production
+如果遇到 lockfile 冻结报错（之前你遇到过），可以用：
+bash
+BUN_INSTALL_FROZEN_LOCKFILE=0 bun install --production
+五、运行部署脚本（同步到 /opt 并重启服务）
+确保脚本有执行权限：
+bash
+chmod +x deploy/deploy.sh
+然后执行部署（会自动 rsync 到 /opt/huas-api、安装依赖、重启 systemd 服务）：
+bash
+sudo ./deploy/deploy.sh

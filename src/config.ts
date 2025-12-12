@@ -54,13 +54,16 @@ export const LOG_CONFIG = {
     ENABLE_CONSOLE: process.env.LOG_ENABLE_CONSOLE !== 'false',
     
     /** 是否启用文件输出 */
-    ENABLE_FILE: process.env.LOG_ENABLE_FILE !== 'false',
+    ENABLE_FILE: process.env.LOG_ENABLE_FILE === 'true',
 };
 
 // 业务配置
 export const BUSINESS_CONFIG = {
     /** 课表缓存 TTL (秒) - 7天，避免频繁过期 */
     SCHEDULE_TTL: 7 * 24 * 3600,
+    
+    /** 成绩缓存 TTL (秒) - 半天刷新一次以兼顾实时性 */
+    GRADES_TTL: 12 * 3600,
     
     /** 用户信息缓存 TTL (秒) */
     USER_INFO_TTL: 2592000,
@@ -71,8 +74,8 @@ export const BUSINESS_CONFIG = {
     /** 僵尸会话清理时间 (分钟) */
     ZOMBIE_SESSION_TIMEOUT: 10,
     
-    /** 不活跃会话清理时间 (天) */
-    INACTIVE_SESSION_TIMEOUT: 90,
+    /** 不活跃会话清理时间 (天) - 与前端 30 天免登一致 */
+    INACTIVE_SESSION_TIMEOUT: 30,
     
     /** 过期缓存清理时间 (天) */
     CACHE_EXPIRY_DAYS: 60,

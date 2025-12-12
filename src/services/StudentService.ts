@@ -10,6 +10,7 @@ import { HuasClient } from '../core/HuasClient';
 import { ScheduleParser } from '../parsers/ScheduleParser';
 import { ECardParser } from '../parsers/ECardParser';
 import { UserParser } from '../parsers/UserParser';
+import { GradeParser } from '../parsers/GradeParser';
 import { BUSINESS_CONFIG } from '../config';
 import { maskStudentId, maskToken } from '../core/security';
 import loggerInstance from '../core/utils/Logger';
@@ -70,6 +71,24 @@ export class StudentService extends BaseService {
     }
 
     // ========== 业务方法 ==========
+
+    /**
+     * 获取成绩单
+     * @param refresh 是否强制刷新
+     */
+    async getGrades(refresh = false) {
+        const result = await this.fetchData(
+            {
+                type: 'GRADES',
+                forceRefresh: refresh,
+                ttl: BUSINESS_CONFIG.GRADES_TTL
+            },
+            () => this.client.fetchGradesRaw(),
+            GradeParser
+        );
+
+        return { ...result.data, _source: result.source };
+    }
 
     /**
      * 获取课程表

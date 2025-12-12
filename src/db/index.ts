@@ -13,6 +13,8 @@ loggerInstance.info("数据库初始化", { path: DB_CONFIG.DB_PATH });
 
 // 开启 WAL 模式提升并发性能
 db.exec("PRAGMA journal_mode = WAL;");
+// 避免高并发写锁失败
+db.exec("PRAGMA busy_timeout = 5000;");
 
 // 1. 用户表 (User Registry) - 方便未来扩展统计或封禁功能
 db.run(`
@@ -20,9 +22,22 @@ db.run(`
     student_id TEXT PRIMARY KEY,
     name TEXT,
     class_name TEXT,
-    last_active_at INTEGER
+    last_active_at INTEGER,
+    created_at INTEGER
   )
 `);
+
+// 补充 created_at 列（老表兼容）
+try {
+  const cols = db.query("PRAGMA table_info(users);").all() as Array<{ name: string; }>;
+  const hasCreated = cols.some(c => c.name === 'created_at');
+  if (!hasCreated) {
+    db.exec(`ALTER TABLE users ADD COLUMN created_at INTEGER;`);
+    loggerInstance.info("为 users 表补充 created_at 字段");
+  }
+} catch (e) {
+  loggerInstance.warn("检查/补充 users.created_at 失败", { error: (e as any)?.message });
+}
 
 // 2. 会话表 (Session Layer) - 允许多个 Token 指向同一个 user_id
 db.run(`

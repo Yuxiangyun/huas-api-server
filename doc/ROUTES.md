@@ -153,6 +153,7 @@ app.post('/auth/logout', async (c) => {
 
 | 方法 | 路径 | 功能 | 缓存策略 | 强制刷新 |
 |------|------|------|---------|---------|
+| GET | /api/grades | 获取成绩单 | 12 小时 | ✅ |
 | GET | /api/schedule | 获取课表 | 动态TTL（周一过期） | ✅ |
 | GET | /api/ecard | 获取一卡通 | 无缓存 | ❌ |
 | GET | /api/user | 获取用户信息 | 30天 | ✅ |

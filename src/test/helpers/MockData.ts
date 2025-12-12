@@ -195,3 +195,151 @@ export const CACHE_TEST_DATA = {
         lastTime: '2025-12-10 10:00:00'
     }
 };
+
+/** 扩展的登录测试数据集 */
+export const LOGIN_TEST_DATASETS = {
+    VALID: {
+        sessionId: TEST_TOKENS.VALID,
+        username: '202401001',
+        password: 'Password123',
+        code: 'AB12'
+    },
+    INVALID_STUDENT_ID_SHORT: {
+        sessionId: TEST_TOKENS.VALID,
+        username: '123',
+        password: 'Password123',
+        code: 'AB12'
+    },
+    INVALID_STUDENT_ID_SPECIAL_CHARS: {
+        sessionId: TEST_TOKENS.VALID,
+        username: '2024-01-001',
+        password: 'Password123',
+        code: 'AB12'
+    },
+    INVALID_PASSWORD_SHORT: {
+        sessionId: TEST_TOKENS.VALID,
+        username: '202401001',
+        password: '123',
+        code: 'AB12'
+    },
+    INVALID_PASSWORD_LONG: {
+        sessionId: TEST_TOKENS.VALID,
+        username: '202401001',
+        password: 'a'.repeat(51),
+        code: 'AB12'
+    },
+    INVALID_CODE_LENGTH: {
+        sessionId: TEST_TOKENS.VALID,
+        username: '202401001',
+        password: 'Password123',
+        code: '1'
+    },
+    INVALID_CODE_SPECIAL_CHARS: {
+        sessionId: TEST_TOKENS.VALID,
+        username: '202401001',
+        password: 'Password123',
+        code: 'AB@#'
+    },
+    SQL_INJECTION_USERNAME: {
+        sessionId: TEST_TOKENS.VALID,
+        username: "' OR '1'='1",
+        password: 'Password123',
+        code: 'AB12'
+    },
+    XSS_PASSWORD: {
+        sessionId: TEST_TOKENS.VALID,
+        username: '202401001',
+        password: '<script>alert("xss")</script>',
+        code: 'AB12'
+    }
+};
+
+/** 真实样本数据集（脱敏后的真实结构） */
+export const REAL_LIKE_FIXTURES = {
+    /** 真实课表 HTML 样本 */
+    SCHEDULE_HTML_COMPLEX: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>课程表</title></head>
+<body>
+<script>
+var li_showWeek = '2024-2025学年第一学期第15周';
+</script>
+<table class="kb_table">
+<tbody>
+<tr>
+    <td>第1节</td>
+    <td></td>
+    <td>
+        <div class="kb_content">
+            <p title="课程名称：高等数学（上）<br/>上课地点：教学楼A-301<br/>教师：张教授<br/>上课时间：1-16周"></p>
+        </div>
+    </td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr>
+<tr>
+    <td>第3节</td>
+    <td></td>
+    <td></td>
+    <td>
+        <div class="kb_content">
+            <p title="课程名称：大学英语<br/>上课地点：外语楻B-201<br/>教师：李老师<br/>上课时间：1-18周(单周)"></p>
+        </div>
+    </td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr>
+<tr>
+    <td>第5节</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td>
+        <div class="kb_content">
+            <p title="课程名称：数据结构与算法<br/>上课地点：实验楼303<br/>教师：王副教授<br/>上课时间：1-16周"></p>
+        </div>
+    </td>
+    <td></td>
+    <td></td>
+    <td></td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
+    `,
+    
+    /** 真实用户信息 JSON 样本 */
+    USER_INFO_JSON_COMPLETE: {
+        code: 0,
+        data: {
+            username: '202401001',
+            attributes: {
+                userName: '测试学生',
+                organizationName: '计算机科学与技术2024-1班',
+                identityTypeName: '学生',
+                organizationCode: 'CS2024-1',
+                email: 'test@example.edu.cn',
+                phone: '13800138000'
+            }
+        }
+    },
+    
+    /** 真实一卡通 JSON 样本 */
+    ECARD_JSON_WITH_TRANSACTIONS: {
+        code: '0',
+        data: {
+            cardWallet: '125.50',
+            cardStatus: '正常',
+            dbTime: '2025-12-10 10:30:00',
+            transactions: [
+                { type: '消费', amount: '-12.50', merchant: '食堂一楼', time: '2025-12-10 08:00' },
+                { type: '充值', amount: '+100.00', merchant: '自助机', time: '2025-12-09 18:00' }
+            ]
+        }
+    }
+};

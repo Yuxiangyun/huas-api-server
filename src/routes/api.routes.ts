@@ -19,6 +19,13 @@ export function registerApiRoutes<E extends { Variables: { userId: string; clien
         rateLimit: SECURITY_CONFIG.API_RATE_LIMIT
     }));
     
+    // 获取成绩单
+    app.get('/api/grades', createHandler(async (c) => {
+        const refresh = c.req.query('refresh') === 'true';
+        const service = new StudentService(c.get('userId'));
+        return service.getGrades(refresh);
+    }));
+    
     // 获取课程表
     app.get('/api/schedule', createHandler(async (c) => {
         const refresh = c.req.query('refresh') === 'true';

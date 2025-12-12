@@ -46,6 +46,19 @@ export class CacheRepo {
             return null;
         }
     }
+
+    /**
+     * 删除缓存
+     * @param studentId 学号
+     * @param type 可选，指定类型则仅删除该类型
+     */
+    delete(studentId: string, type?: string) {
+        if (type) {
+            db.prepare(`DELETE FROM data_cache WHERE student_id = ? AND type = ?`).run(studentId, type);
+        } else {
+            db.prepare(`DELETE FROM data_cache WHERE student_id = ?`).run(studentId);
+        }
+    }
 }
 
 export const dataCacheRepo = new CacheRepo();

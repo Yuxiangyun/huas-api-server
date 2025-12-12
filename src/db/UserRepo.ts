@@ -4,12 +4,13 @@ import { db } from './index';
 export class UserRepo {
     // 更新用户基本信息
     private updateStmt = db.prepare(`
-        INSERT INTO users (student_id, name, class_name, last_active_at)
-        VALUES ($sid, $name, $cls, $time)
+        INSERT INTO users (student_id, name, class_name, last_active_at, created_at)
+        VALUES ($sid, $name, $cls, $time, $time)
         ON CONFLICT(student_id) DO UPDATE SET
             name = $name,
             class_name = $cls,
-            last_active_at = $time
+            last_active_at = $time,
+            created_at = COALESCE(users.created_at, excluded.created_at)
     `);
 
     // 更新活跃时间 (轻量级)

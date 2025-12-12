@@ -3,7 +3,7 @@
  * 测试 StatsRepo 的统计查询功能
  */
 import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
-import { db } from '../../db/index';
+import { db } from '../../db';
 import { StatsRepo } from '../../db/StatsRepo';
 import { SessionRepo } from '../../db/SessionRepo';
 import { CacheRepo } from '../../db/CacheRepo';
@@ -178,7 +178,7 @@ describe('统计仓库测试', () => {
         test('各类型缓存之和应等于总缓存数', () => {
             const stats = statsRepo.getCacheStats();
             
-            const sum = stats.scheduleCache + stats.ecardCache + stats.userInfoCache;
+            const sum = stats.scheduleCache + stats.gradeCache + stats.ecardCache + stats.userInfoCache;
             // 注意：由于数据库中可能还有其他类型的缓存，只验证总数大于等于已知类型之和
             expect(stats.totalCacheRecords).toBeGreaterThanOrEqual(sum);
         });

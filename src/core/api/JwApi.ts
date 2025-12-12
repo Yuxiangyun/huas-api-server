@@ -8,8 +8,16 @@ import { JW_CONFIG } from '../../config';
 
 /** 教务系统 API 地址 */
 const URLS = {
-    kbApi: "https://xyjw.huas.edu.cn/jsxsd/framework/main_index_loadkb.jsp"
+    kbApi: "https://xyjw.huas.edu.cn/jsxsd/framework/main_index_loadkb.jsp",
+    gradeApi: "https://xyjw.huas.edu.cn/jsxsd/kscj/cjcx_list"
 };
+
+export interface GradeQueryParams {
+    kksj?: string;
+    kcxz?: string;
+    kcmc?: string;
+    xsfs?: string;
+}
 
 export class JwApi {
     constructor(private session: NetworkSession) {}
@@ -38,6 +46,36 @@ export class JwApi {
         // 双重检查：HTML 内容是否包含登录表单
         if (text.includes('id="username"') || text.includes('用户登录')) {
             throw new SessionExpiredError("课程表响应包含登录表单");
+        }
+
+        return text;
+    }
+
+    /**
+     * 获取成绩列表原始 HTML
+     * @param query 查询参数
+     */
+    async getGradesRaw(query: GradeQueryParams = {}): Promise<string> {
+        const params = new URLSearchParams();
+        params.append('kksj', query.kksj ?? '');
+        params.append('kcxz', query.kcxz ?? '');
+        params.append('kcmc', query.kcmc ?? '');
+        params.append('xsfs', query.xsfs ?? 'max');
+
+        const res = await this.session.request(URLS.gradeApi, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://xyjw.huas.edu.cn/jsxsd/kscj/cjcx_query'
+            },
+            body: params
+        });
+
+        const text = await res.text();
+
+        // 登录态失效检测
+        if (text.includes('id="username"') || text.includes('用户登录')) {
+            throw new SessionExpiredError("成绩响应包含登录表单");
         }
 
         return text;

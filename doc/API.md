@@ -294,6 +294,77 @@ GET /api/schedule?refresh=true
 
 ---
 
+### 2.4 获取成绩单
+
+**接口**: `GET /api/grades`
+
+**描述**: 获取已出成绩列表，包含汇总信息和清洗后的课程成绩。
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| refresh | boolean | 否 | 是否强制刷新缓存 |
+
+**请求示例**:
+```
+GET /api/grades
+GET /api/grades?refresh=true
+```
+
+**成功响应**:
+```json
+{
+  "code": 200,
+  "data": {
+    "summary": {
+      "totalCourses": 26,
+      "totalCredits": 60,
+      "averageGpa": 2.2,
+      "averageScore": 74.85
+    },
+    "items": [
+      {
+        "term": "2024-2025-1",
+        "courseCode": "22000001",
+        "courseName": "思想道德与法治",
+        "groupName": "",
+        "score": 87,
+        "scoreText": "87",
+        "pass": true,
+        "flag": "",
+        "credit": 3,
+        "totalHours": 56,
+        "gpa": 3.7,
+        "retakeTerm": "",
+        "examMethod": "考试",
+        "examNature": "正常考试",
+        "courseAttribute": "必修",
+        "courseNature": "公共基础课",
+        "courseCategory": ""
+      }
+    ],
+    "_source": "network"
+  }
+}
+```
+
+**字段说明**:
+- `summary.totalCourses`：所修门数
+- `summary.totalCredits`：所修总学分
+- `summary.averageGpa`：平均绩点
+- `summary.averageScore`：平均成绩
+- `items.score`：数值分数（无法转换则为 null）
+- `items.scoreText`：原始成绩文本（如“及格”“中”）
+- `items.pass`：是否通过（无法判断则为 null）
+- 其他字段与教务系统表格列对应。
+
+**实现细节**:
+- 复现抓包请求：POST `https://xyjw.huas.edu.cn/jsxsd/kscj/cjcx_list`，`Content-Type: application/x-www-form-urlencoded`，`Referer: https://xyjw.huas.edu.cn/jsxsd/kscj/cjcx_query`，默认表单 `kksj=&kcxz=&kcmc=&xsfs=max`。
+- 解析 HTML 表格，去除链接/颜色标记，自动提取分数、绩点、学分等数值。
+- 缓存策略：12 小时，可通过 `refresh=true` 强制刷新。
+
+---
+
 ## 3. 系统模块 (System)
 
 ### 3.1 健康检查

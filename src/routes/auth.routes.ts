@@ -24,6 +24,7 @@ export function registerAuthRoutes<E extends { Variables: { userId: string; clie
         createRateLimitMiddleware('captcha', SECURITY_CONFIG.CAPTCHA_RATE_LIMIT),
         async (c) => {
         const clientIP = c.get('clientIP' as any);
+        const userAgent = c.req.header('user-agent') || 'unknown';
         const tempId = uuidv4();
         loggerInstance.info("生成新的验证码会话", { sessionId: maskToken(tempId), ip: clientIP });
         
@@ -36,7 +37,7 @@ export function registerAuthRoutes<E extends { Variables: { userId: string; clie
             
             // 保存临时会话到数据库
             const state = client.exportState();
-            sessionRepo.createTemp(tempId, state.cookies, state.execution || '');
+            sessionRepo.createTemp(tempId, state.cookies, state.execution || '', userAgent, clientIP);
             
             loggerInstance.info("验证码获取成功", { sessionId: maskToken(tempId) });
 

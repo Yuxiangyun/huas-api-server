@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  --background: 30 40% 96%;
+  --foreground: 25 24% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 25 24% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 25 24% 16%;
+  --primary: 25 46% 50%; /* 暖棕 */
+  --primary-foreground: 34 54% 97%;
+  --secondary: 35 48% 94%; /* 奶油白 */
+  --secondary-foreground: 25 24% 16%;
+  --muted: 35 40% 90%;
+  --muted-foreground: 25 10% 36%;
+  --accent: 32 30% 84%;
+  --accent-foreground: 25 24% 16%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 34 54% 97%;
+  --border: 25 15% 82%;
+  --input: 25 15% 82%;
+  --ring: 25 46% 50%;
+  --radius: 12px;
+}
+
+:root[data-theme="dark"] {
+  --background: 0 0% 0%;
+  --foreground: 34 54% 97%;
+  --card: 0 0% 8%;
+  --card-foreground: 34 54% 97%;
+  --popover: 0 0% 8%;
+  --popover-foreground: 34 54% 97%;
+  --primary: 25 46% 50%;
+  --primary-foreground: 34 54% 97%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 34 54% 97%;
+  --muted: 0 0% 14%;
+  --muted-foreground: 34 25% 80%;
+  --accent: 25 20% 28%;
+  --accent-foreground: 34 54% 97%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 18%;
+  --input: 0 0% 18%;
+  --ring: 25 46% 50%;
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* 手动切换 data-theme，默认浅色 */
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}

@@ -5,6 +5,7 @@
 import loggerInstance from './Logger';
 import { scheduler } from '../Scheduler';
 import { db } from '../../db';
+import { SERVER_CONFIG } from '../../config';
 
 export class ProcessManager {
     private isShuttingDown = false;
@@ -28,7 +29,31 @@ export class ProcessManager {
         
         // 监听未捕获异常
         process.on('uncaughtException', (error) => {
-            loggerInstance.error('未捕获的异常', { error: error.message, stack: error.stack });
+            console.error('='.repeat(80));
+            console.error('未捕获的异常:');
+            console.error('Message:', error.message);
+            console.error('Stack:', error.stack);
+            console.error('Error Object:', error);
+            console.error('='.repeat(80));
+            
+            // 特殊错误处理：端口占用
+            if ((error as any).code === 'EADDRINUSE') {
+                console.error('\n❌ 端口已被占用！');
+                console.error('解决方案：');
+                console.error('1. 查看占用端口的进程: lsof -i :' + SERVER_CONFIG.PORT);
+                console.error('2. 杀死占用进程: kill <PID>');
+                console.error('3. 或使用其他端口: PORT=3001 bun run dev\n');
+            }
+            
+            loggerInstance.error('未捕获的异常', { 
+                message: error.message, 
+                stack: error.stack,
+                name: error.name,
+                code: (error as any).code,
+                errno: (error as any).errno,
+                syscall: (error as any).syscall,
+                error: String(error)
+            });
             this.handleShutdown('uncaughtException');
         });
         

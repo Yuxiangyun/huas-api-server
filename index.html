@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>HUAS SCHEDULE</title>
+    <title>文理小助手</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -56,19 +56,19 @@
 
     <!-- 头部 -->
     <header class="mb-6 text-center w-full">
-        <h1 class="text-3xl font-black tracking-tighter text-popTeal italic">HUAS <span class="text-ink">SCHEDULE</span></h1>
+        <h1 class="text-3xl font-black tracking-tighter text-popTeal italic">HUAS <span class="text-ink">Assistant</span></h1>
     </header>
 
     <!-- Loading -->
     <div id="loading" class="hidden fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
         <div class="animate-spin rounded-full h-10 w-10 border-4 border-popTeal border-t-popOrange mb-3"></div>
-        <div class="font-black bg-popYellow px-3 py-1 border border-ink shadow-hard text-xs">LOADING...</div>
+        <div class="font-black bg-popYellow px-3 py-1 border border-ink shadow-hard text-xs">加载中...</div>
     </div>
 
     <!-- 登录卡片 -->
     <section id="loginCard" class="w-full max-w-sm bg-white border-2 border-ink rounded-xl shadow-hard p-5 mb-8">
         <div class="flex items-center justify-between mb-5">
-            <h2 class="text-xl font-black">LOGIN</h2>
+            <h2 class="text-xl font-black">登录</h2>
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-bold text-slate-400">SYSTEM READY</span>
                 <div class="w-2.5 h-2.5 rounded-full bg-green-400 border border-ink animate-pulse"></div>
@@ -98,15 +98,18 @@
                     </div>
                 </div>
             </div>
+            <label class="flex items-center gap-2 text-xs font-bold text-slate-500 select-none">
+                <input id="rememberMe" type="checkbox" class="w-4 h-4 border-2 border-ink rounded">
+                记住学号和密码
+            </label>
             <button onclick="handleLogin()" class="w-full bg-popTeal border-2 border-ink text-white font-black py-3 rounded-lg shadow-hard hover:translate-y-[-2px] hover:bg-popOrange transition-all active:translate-y-0 active:shadow-none mt-2">
                 登 录
             </button>
         </div>
     </section>
 
-    <!-- 数据展示区域 -->
-    <section id="dataArea" class="hidden w-full max-w-4xl animate-pulse space-y-4">
-        
+    <!-- 数据展示区域：顶置信息 + 课表 + 折叠成绩单 -->
+    <section id="dataArea" class="hidden w-full max-w-4xl space-y-4">
         <!-- 顶部信息栏：个人 + 一卡通 -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- 个人信息 -->
@@ -118,52 +121,82 @@
                     <div class="text-xl font-black text-ink truncate" id="uiName">--</div>
                     <div class="flex flex-wrap gap-1 mt-1">
                         <span class="px-1.5 py-0.5 bg-slate-100 border border-ink rounded text-[10px] font-bold font-mono" id="uiId">--</span>
-                        <span class="px-1.5 py-0.5 bg-popYellow/50 border border-ink rounded text-[10px] font-bold truncate max-w-[120px]" id="uiClass">--</span>
+                        <span class="px-1.5 py-0.5 bg-popYellow/50 border border-ink rounded text-[10px] font-bold truncate max-w-[160px]" id="uiClass">--</span>
                     </div>
                 </div>
                 <button onclick="handleLogout()" class="absolute top-0 right-0 p-3 text-[10px] font-bold text-slate-300 hover:text-red-500">退出</button>
             </div>
 
-            <!-- 一卡通 (已修复未知状态) -->
-            <div class="bg-ink text-white border-2 border-ink rounded-xl shadow-hard p-4 flex flex-col justify-between relative overflow-hidden h-24 md:h-auto">
+            <!-- 一卡通 -->
+            <div class="bg-ink text-white border-2 border-ink rounded-xl shadow-hard p-4 flex flex-col justify-between relative overflow-hidden">
                 <div class="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                 <div class="flex justify-between items-start z-10">
                     <span class="text-[10px] font-bold text-popCyan tracking-widest opacity-80">E-CARD</span>
-                    <!-- 状态标签 -->
-                    <span class="px-2 py-0.5 border border-popCyan/40 bg-popCyan/10 rounded-full text-[10px] font-bold text-popCyan" id="ecStatus">
-                        Checking...
-                    </span>
+                    <span class="px-2 py-0.5 border border-popCyan/40 bg-popCyan/10 rounded-full text-[10px] font-bold text-popCyan" id="ecStatus">--</span>
                 </div>
-                <div class="z-10 mt-1">
+                <div class="z-10 mt-1 flex justify-between items-end">
                     <div class="text-3xl font-black tracking-tighter flex items-baseline gap-1">
                         <span class="text-sm text-popOrange">¥</span>
                         <span id="ecBalance">--</span>
                     </div>
+                    <button onclick="loadEcard(true)" class="text-[10px] font-bold bg-white/10 px-2 py-1 border border-white/30 rounded hover:bg-white/20 active:scale-95 transition-all">
+                        刷新一卡通
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- 课程表 (移动端 Sticky 优化版) -->
-        <div class="w-full bg-white border-2 border-ink rounded-xl shadow-hard p-0 overflow-hidden flex flex-col">
-            <!-- 课表标题栏 -->
-            <div class="flex justify-between items-center p-4 border-b-2 border-slate-100">
+        <!-- 课表（默认展开） -->
+        <div class="bg-white border-2 border-ink rounded-xl shadow-hard overflow-hidden">
+            <div class="flex items-center justify-between p-4 border-b-2 border-slate-100">
                 <div class="flex items-center gap-2">
                     <div class="w-2 h-5 bg-popTeal border-2 border-ink -rotate-6 rounded-sm"></div>
-                    <h3 class="text-lg font-black tracking-tight" id="schWeek">--</h3>
+                    <h3 class="text-lg font-black tracking-tight">课表</h3>
+                    <span class="text-[10px] font-bold text-slate-400" id="schWeek">--</span>
                 </div>
-                <button onclick="loadAllData()" class="text-[10px] font-bold bg-slate-50 px-3 py-1.5 border border-slate-300 rounded hover:bg-white active:scale-95 transition-all">
-                    刷新
+                <button onclick="loadSchedule(true)" class="text-[10px] font-bold bg-slate-50 px-3 py-1.5 border border-slate-300 rounded hover:bg-white active:scale-95 transition-all">
+                    刷新课表
                 </button>
             </div>
-
-            <!-- 滚动区域 -->
             <div class="overflow-x-auto hide-scroll pb-2">
-                <!-- 
-                    移动端宽度设置为 160% (min-w-[160vw]) 强制横向滚动
-                    PC端则自适应 100% 
-                -->
-                <div class="min-w-[160vw] md:min-w-full" id="scheduleContainer">
-                    <!-- JS 生成内容 -->
+                <div class="min-w-[160vw] md:min-w-full" id="scheduleContainer"></div>
+            </div>
+        </div>
+
+        <!-- 成绩（默认收起） -->
+        <div class="bg-white border-2 border-ink rounded-xl shadow-hard overflow-hidden" data-panel="grades" data-open="false">
+            <div class="flex items-center justify-between p-4 border-b-2 border-slate-100">
+                <button class="flex items-center gap-2" onclick="togglePanel('grades')">
+                    <div class="w-2 h-5 bg-popOrange border-2 border-ink -rotate-6 rounded-sm"></div>
+                    <h3 class="text-lg font-black tracking-tight">成绩单</h3>
+                    <span id="gradeSource" class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 border border-slate-200 rounded text-slate-500">--</span>
+                </button>
+                <button onclick="refreshGradesButton()" class="text-[10px] font-bold bg-slate-50 px-3 py-1.5 border border-slate-300 rounded hover:bg-white active:scale-95 transition-all">
+                    刷新成绩
+                </button>
+            </div>
+            <div id="panelContent-grades" class="hidden">
+                <div class="p-4 space-y-3">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm font-bold">
+                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50/60">
+                            <div class="text-[10px] text-slate-500 mb-1">所修门数</div>
+                            <div id="gTotal" class="text-lg">--</div>
+                        </div>
+                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50/60">
+                            <div class="text-[10px] text-slate-500 mb-1">所修总学分</div>
+                            <div id="gCredits" class="text-lg">--</div>
+                        </div>
+                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50/60">
+                            <div class="text-[10px] text-slate-500 mb-1">平均绩点</div>
+                            <div id="gGpa" class="text-lg">--</div>
+                        </div>
+                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50/60">
+                            <div class="text-[10px] text-slate-500 mb-1">平均成绩</div>
+                            <div id="gAvg" class="text-lg">--</div>
+                        </div>
+                    </div>
+
+                    <div id="gradeList" class="space-y-3"></div>
                 </div>
             </div>
         </div>
@@ -174,6 +207,8 @@
         
         let currentSessionId = '';
         let globalToken = localStorage.getItem('huas_token') || '';
+        const panelLoaded = { schedule: false, grades: false };
+        const SAVED_CRED_KEY = 'huas_saved_cred';
 
         const COURSE_COLORS = [
             'bg-popCyan', 'bg-popYellow', 'bg-popOrange', 'bg-popPurple', 
@@ -183,13 +218,14 @@
         if (globalToken) {
             loadAllData();
         } else {
+            loadSavedCredentials();
             initCaptcha();
         }
 
         async function initCaptcha() {
             setLoading(true);
             try {
-                const res = await fetch(`${API_BASE}/auth/captcha`);
+                const res = await fetch(`${API_BASE}/auth/captcha`, { cache: 'no-store' });
                 const json = await res.json();
                 if (json.code === 200) {
                     currentSessionId = json.data.sessionId;
@@ -224,6 +260,7 @@
                 if (json.code === 200) {
                     globalToken = json.token;
                     localStorage.setItem('huas_token', globalToken);
+                    saveCredentialsIfNeeded(u, p);
                     loadAllData();
                 } else {
                     alert('登录失败: ' + json.msg);
@@ -241,37 +278,36 @@
             setLoading(true);
             document.getElementById('loginCard').classList.add('hidden');
             document.getElementById('dataArea').classList.remove('hidden');
-            document.getElementById('dataArea').classList.remove('animate-pulse');
+            await Promise.all([
+                loadUser(false),
+                loadEcard(false),
+                loadSchedule(false)
+            ]);
+            setLoading(false);
+        }
 
-            const headers = { 'Authorization': globalToken };
+        async function loadUser(refresh = false, withSpinner = true) {
+            if (!globalToken) return alert('请先登录');
+            if (withSpinner) setLoading(true);
             try {
-                const [resUser, resEcard, resSch] = await Promise.all([
-                    fetch(`${API_BASE}/api/user`, { headers }),
-                    fetch(`${API_BASE}/api/ecard`, { headers }),
-                    fetch(`${API_BASE}/api/schedule`, { headers })
-                ]);
-
-                if ([resUser.status, resEcard.status, resSch.status].includes(401)) {
-                    throw new Error('SESSION_EXPIRED');
-                }
-
-                const dUser = await resUser.json();
-                const dEcard = await resEcard.json();
-                const dSch = await resSch.json();
-
-                renderUser(dUser.data);
-                renderEcard(dEcard.data);
-                renderSchedule(dSch.data);
-
+                const res = await fetch(`${API_BASE}/api/user${refresh ? '?refresh=true' : ''}`, { 
+                    headers: { 'Authorization': globalToken },
+                    cache: 'no-store'
+                });
+                if (res.status === 401) throw new Error('SESSION_EXPIRED');
+                const json = await res.json();
+                renderUser(json.data);
+                panelLoaded.user = true;
             } catch (e) {
                 if (e.message === 'SESSION_EXPIRED') {
                     alert('登录已过期，请重新登录');
                     handleLogout();
                 } else {
+                    alert('用户信息获取失败');
                     console.error(e);
                 }
             } finally {
-                setLoading(false);
+                if (withSpinner) setLoading(false);
             }
         }
 
@@ -282,6 +318,31 @@
             document.getElementById('uiClass').innerText = data.className;
             const seed = encodeURIComponent(data.name || 'Student');
             document.getElementById('userAvatar').src = `https://api.dicebear.com/9.x/notionists/svg?seed=${seed}&backgroundColor=e9d5ff`;
+        }
+
+        async function loadEcard(refresh = false, withSpinner = true) {
+            if (!globalToken) return alert('请先登录');
+            if (withSpinner) setLoading(true);
+            try {
+                const res = await fetch(`${API_BASE}/api/ecard${refresh ? '?refresh=true' : ''}`, { 
+                    headers: { 'Authorization': globalToken },
+                    cache: 'no-store'
+                });
+                if (res.status === 401) throw new Error('SESSION_EXPIRED');
+                const json = await res.json();
+                renderEcard(json.data);
+                panelLoaded.ecard = true;
+            } catch (e) {
+                if (e.message === 'SESSION_EXPIRED') {
+                    alert('登录已过期，请重新登录');
+                    handleLogout();
+                } else {
+                    alert('一卡通获取失败');
+                    console.error(e);
+                }
+            } finally {
+                if (withSpinner) setLoading(false);
+            }
         }
 
         // 🔥 修复：一卡通状态未知显示问题
@@ -308,6 +369,31 @@
             }
 
             document.getElementById('ecBalance').innerText = balanceText;
+        }
+
+        async function loadSchedule(refresh = false, withSpinner = true) {
+            if (!globalToken) return alert('请先登录');
+            if (withSpinner) setLoading(true);
+            try {
+                const res = await fetch(`${API_BASE}/api/schedule${refresh ? '?refresh=true' : ''}`, { 
+                    headers: { 'Authorization': globalToken },
+                    cache: 'no-store'
+                });
+                if (res.status === 401) throw new Error('SESSION_EXPIRED');
+                const json = await res.json();
+                renderSchedule(json.data);
+                panelLoaded.schedule = true;
+            } catch (e) {
+                if (e.message === 'SESSION_EXPIRED') {
+                    alert('登录已过期，请重新登录');
+                    handleLogout();
+                } else {
+                    alert('课表获取失败');
+                    console.error(e);
+                }
+            } finally {
+                if (withSpinner) setLoading(false);
+            }
         }
 
         // 🔥 移动端 Sticky 课表
@@ -391,15 +477,152 @@
             container.innerHTML = html;
         }
 
+        async function loadGrades(refresh = false) {
+            if (!globalToken) return alert('请先登录');
+            setLoading(true);
+            try {
+                const res = await fetch(`${API_BASE}/api/grades${refresh ? '?refresh=true' : ''}`, {
+                    headers: { 'Authorization': globalToken },
+                    cache: 'no-store'
+                });
+                if (res.status === 401) throw new Error('SESSION_EXPIRED');
+                const json = await res.json();
+                renderGrades(json.data);
+                panelLoaded.grades = true;
+            } catch (e) {
+                if (e.message === 'SESSION_EXPIRED') {
+                    alert('登录已过期，请重新登录');
+                    handleLogout();
+                } else {
+                    alert('成绩获取失败');
+                    console.error(e);
+                }
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function renderGrades(data) {
+            if (!data) return;
+            const summary = data.summary || {};
+            document.getElementById('gTotal').innerText = summary.totalCourses ?? '--';
+            document.getElementById('gCredits').innerText = summary.totalCredits ?? '--';
+            document.getElementById('gGpa').innerText = summary.averageGpa ?? '--';
+            document.getElementById('gAvg').innerText = summary.averageScore ?? '--';
+            document.getElementById('gradeSource').innerText = data._source ? data._source.toUpperCase() : '--';
+
+            const list = document.getElementById('gradeList');
+            list.innerHTML = '';
+            const items = data.items || [];
+
+            // 按学期分组并按时间倒序
+            const groupMap = {};
+            items.forEach(item => {
+                const term = item.term || '未知学期';
+                if (!groupMap[term]) groupMap[term] = [];
+                groupMap[term].push(item);
+            });
+
+            const parseTerm = (term) => {
+                const m = term.match(/(\d{4}).*?(\d{4}).*?(\d+)/);
+                if (m) return { y1: parseInt(m[1]), y2: parseInt(m[2]), sem: parseInt(m[3]) };
+                return null;
+            };
+            const sortedTerms = Object.keys(groupMap).sort((a, b) => {
+                const pa = parseTerm(a); const pb = parseTerm(b);
+                if (pa && pb) {
+                    if (pa.y1 !== pb.y1) return pb.y1 - pa.y1;
+                    if (pa.y2 !== pb.y2) return pb.y2 - pa.y2;
+                    return (pb.sem || 0) - (pa.sem || 0);
+                }
+                return b.localeCompare(a);
+            });
+
+            sortedTerms.forEach(term => {
+                list.innerHTML += `
+                    <div class="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] font-black text-slate-600 tracking-wide">
+                        ${term}
+                    </div>
+                `;
+                groupMap[term].forEach(item => {
+                    const passTag = item.pass === null ? '' : item.pass ? 'text-popTeal' : 'text-red-500';
+                    const scoreText = item.score !== null ? item.score : item.scoreText || '--';
+                    list.innerHTML += `
+                        <div class="p-3 border border-slate-200 rounded-xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-[12px] text-slate-500 font-bold">${item.term}</div>
+                                    <div class="text-base font-black text-ink leading-tight mt-1 line-clamp-2">${item.courseName}</div>
+                                    <div class="text-[11px] text-slate-400 font-mono mt-0.5">${item.courseCode || '--'}</div>
+                                </div>
+                                <div class="flex flex-col items-end text-right">
+                                    <div class="text-lg font-black ${passTag}">${scoreText}</div>
+                                    <div class="text-[11px] text-slate-500 mt-1">学分 ${item.credit ?? '--'} · 绩点 ${item.gpa ?? '--'}</div>
+                                    <div class="text-[10px] text-slate-400">${item.courseNature || '--'}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-slate-500 mt-2">
+                                <span>类别：${item.courseAttribute || '--'}</span>
+                                <span>性质：${item.courseCategory || '--'}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+        }
+
         function handleLogout() {
             localStorage.removeItem('huas_token');
             globalToken = '';
+            panelLoaded.schedule = panelLoaded.grades = panelLoaded.ecard = panelLoaded.user = false;
             location.reload();
         }
 
         function setLoading(isLoading) {
             const el = document.getElementById('loading');
             el.classList.toggle('hidden', !isLoading);
+        }
+
+        function loadSavedCredentials() {
+            try {
+                const saved = localStorage.getItem(SAVED_CRED_KEY);
+                if (!saved) return;
+                const { username, password, remember } = JSON.parse(saved);
+                if (username) document.getElementById('username').value = username;
+                if (password) document.getElementById('password').value = password;
+                if (remember) document.getElementById('rememberMe').checked = true;
+            } catch {}
+        }
+
+        function saveCredentialsIfNeeded(username, password) {
+            const remember = document.getElementById('rememberMe').checked;
+            if (remember) {
+                localStorage.setItem(SAVED_CRED_KEY, JSON.stringify({ username, password, remember: true }));
+            } else {
+                localStorage.removeItem(SAVED_CRED_KEY);
+            }
+        }
+
+        function togglePanel(name, forceOpen = null) {
+            const container = document.getElementById(`panelContent-${name}`);
+            const wrapper = document.querySelector(`[data-panel="${name}"]`);
+            const isOpen = !container.classList.contains('hidden');
+            const next = forceOpen !== null ? forceOpen : !isOpen;
+            container.classList.toggle('hidden', !next);
+            wrapper?.setAttribute('data-open', next ? 'true' : 'false');
+
+            if (next && name === 'grades' && !panelLoaded.grades) {
+                loadGrades();
+            }
+        }
+
+        function refreshGradesButton() {
+            // 展开折叠并刷新
+            const container = document.getElementById('panelContent-grades');
+            if (container.classList.contains('hidden')) {
+                togglePanel('grades', true);
+            }
+            loadGrades(true);
         }
     </script>
 </body>

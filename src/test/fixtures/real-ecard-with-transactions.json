@@ -1,0 +1,61 @@
+{
+  "code": "0",
+  "msg": "查询成功",
+  "data": {
+    "cardWallet": "125.50",
+    "cardStatus": "正常",
+    "cardNo": "20240100****01",
+    "dbTime": "2025-12-10 10:30:00",
+    "transactions": [
+      {
+        "transType": "消费",
+        "transAmount": "-12.50",
+        "balance": "125.50",
+        "merchantName": "食堂一楼",
+        "transTime": "2025-12-10 08:00:15",
+        "terminalNo": "T001",
+        "remark": "早餐"
+      },
+      {
+        "transType": "消费",
+        "transAmount": "-8.00",
+        "balance": "138.00",
+        "merchantName": "校内超市",
+        "transTime": "2025-12-09 20:15:30",
+        "terminalNo": "T102",
+        "remark": "日用品"
+      },
+      {
+        "transType": "充值",
+        "transAmount": "+100.00",
+        "balance": "146.00",
+        "merchantName": "自助充值机",
+        "transTime": "2025-12-09 18:00:00",
+        "terminalNo": "ATM01",
+        "remark": "支付宝充值"
+      },
+      {
+        "transType": "消费",
+        "transAmount": "-15.00",
+        "balance": "46.00",
+        "merchantName": "食堂二楼",
+        "transTime": "2025-12-09 12:05:20",
+        "terminalNo": "T003",
+        "remark": "午餐"
+      },
+      {
+        "transType": "消费",
+        "transAmount": "-5.00",
+        "balance": "61.00",
+        "merchantName": "图书馆打印室",
+        "transTime": "2025-12-09 10:30:45",
+        "terminalNo": "T201",
+        "remark": "打印费"
+      }
+    ],
+    "totalTransCount": 5,
+    "todayConsume": "-12.50",
+    "weekConsume": "-40.50",
+    "monthConsume": "-185.30"
+  }
+}

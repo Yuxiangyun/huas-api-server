@@ -25,19 +25,18 @@ interface LoggerConfig {
     enableFile: boolean;
 }
 
-// 默认配置
-const DEFAULT_CONFIG: LoggerConfig = {
-    level: LogLevel.INFO,
-    enableConsole: true,
-    enableFile: true
-};
-
 export class Logger {
     private config: LoggerConfig;
     private logStream: fs.WriteStream | null = null;
+    private tokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
     constructor(config?: Partial<LoggerConfig>) {
-        this.config = { ...DEFAULT_CONFIG, ...config };
+        const defaultConfig: LoggerConfig = {
+            level: LogLevel.INFO,
+            enableConsole: true,
+            enableFile: false
+        };
+        this.config = { ...defaultConfig, ...config };
         
         // 创建日志目录
         if (this.config.enableFile && this.config.filePath) {
@@ -54,14 +53,50 @@ export class Logger {
     // 格式化日志消息
     private formatLog(level: string, message: string, meta?: any): string {
         const timestamp = new Date().toISOString();
-        const logEntry: LogEntry = {
+        const sanitizedMeta = meta ? this.sanitizeMeta(meta) : undefined;
+        let logEntry: LogEntry = {
             timestamp,
             level,
             message,
-            meta
+            meta: sanitizedMeta
         };
+
+        let serialized = JSON.stringify(logEntry);
+        const MAX_LEN = 2000;
+        if (serialized.length > MAX_LEN) {
+            logEntry = { ...logEntry, meta: '__omitted__(too_large)' };
+            serialized = JSON.stringify(logEntry);
+        }
         
-        return JSON.stringify(logEntry);
+        return serialized;
+    }
+
+    // 脱敏/裁剪 meta
+    private sanitizeMeta(meta: any): any {
+        const maskValue = (val: string) => {
+            if (!val) return val;
+            if (this.tokenPattern.test(val)) return val.substring(0, 8) + '...';
+            if (/^\d{8,12}$/.test(val)) return val.substring(0, 4) + '****' + val.substring(val.length - 2);
+            if (val.length > 200) return val.substring(0, 200) + '...';
+            return val;
+        };
+
+        if (typeof meta === 'string') return maskValue(meta);
+        if (Array.isArray(meta)) return meta.map(m => this.sanitizeMeta(m));
+        if (meta && typeof meta === 'object') {
+            const obj: any = {};
+            Object.entries(meta).forEach(([k, v]) => {
+                if (k.toLowerCase().includes('token') || k.toLowerCase().includes('cookie')) {
+                    obj[k] = '__hidden__';
+                } else if (typeof v === 'string') {
+                    obj[k] = maskValue(v);
+                } else {
+                    obj[k] = this.sanitizeMeta(v);
+                }
+            });
+            return obj;
+        }
+        return meta;
     }
 
     // 写入日志
@@ -131,7 +166,7 @@ const defaultLogger = new Logger({
     level: process.env.LOG_LEVEL ? LogLevel[process.env.LOG_LEVEL as keyof typeof LogLevel] : LogLevel.INFO,
     filePath: process.env.LOG_FILE_PATH || path.join(process.cwd(), 'logs', 'app.log'),
     enableConsole: process.env.LOG_ENABLE_CONSOLE !== 'false',
-    enableFile: process.env.LOG_ENABLE_FILE !== 'false'
+    enableFile: process.env.LOG_ENABLE_FILE === 'true'
 });
 
 export default defaultLogger;

@@ -33,6 +33,7 @@ export interface SessionStats {
 export interface CacheStats {
     totalCacheRecords: number;    // 总缓存记录数
     scheduleCache: number;        // 课表缓存数
+    gradeCache: number;           // 成绩缓存数
     ecardCache: number;           // 一卡通缓存数
     userInfoCache: number;        // 用户信息缓存数
 }
@@ -148,6 +149,11 @@ export class StatsRepo {
             SELECT COUNT(*) as count FROM data_cache WHERE type = 'ECARD'
         `).get() as { count: number };
 
+        // 成绩缓存数
+        const grade = db.prepare(`
+            SELECT COUNT(*) as count FROM data_cache WHERE type = 'GRADES'
+        `).get() as { count: number };
+
         // 用户信息缓存数
         const userInfo = db.prepare(`
             SELECT COUNT(*) as count FROM data_cache WHERE type = 'USER_INFO'
@@ -156,6 +162,7 @@ export class StatsRepo {
         return {
             totalCacheRecords: total.count,
             scheduleCache: schedule.count,
+            gradeCache: grade.count,
             ecardCache: ecard.count,
             userInfoCache: userInfo.count
         };

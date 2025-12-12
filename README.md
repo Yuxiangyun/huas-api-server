@@ -104,6 +104,7 @@ POST /auth/logout        # 退出登录
 ### 业务模块
 
 ```
+GET /api/grades         # 获取成绩单（含汇总）
 GET /api/schedule        # 获取课表（支持缓存）
 GET /api/ecard           # 获取一卡通（实时）
 GET /api/user            # 获取用户信息（支持缓存）

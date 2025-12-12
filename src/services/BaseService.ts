@@ -155,10 +155,10 @@ export abstract class BaseService {
         if (!userId) return;
         
         if (type) {
-            // TODO: 实现单个缓存失效
+            this.cacheRepo.delete(userId, type);
             loggerInstance.info("缓存失效", { type, userId: userId.substring(0, 8) });
         } else {
-            // TODO: 实现全部缓存失效
+            this.cacheRepo.delete(userId);
             loggerInstance.info("清除所有缓存", { userId: userId.substring(0, 8) });
         }
     }

@@ -14,21 +14,23 @@ export class SessionRepo {
 
     // 登录成功时，更新用户表
     private upsertUserStmt = db.prepare(`
-        INSERT OR REPLACE INTO users (student_id, last_active_at)
-        VALUES ($sid, $time)
+        INSERT OR REPLACE INTO users (student_id, last_active_at, created_at)
+        VALUES ($sid, $time, $time)
     `);
 
     /**
      * 初始化一个临时会话 (仅包含验证码上下文)
      */
-    createTemp(token: string, cookies: any, execution: string) {
+    createTemp(token: string, cookies: any, execution: string, userAgent?: string, clientIP?: string) {
+        const ua = userAgent || 'unknown';
+        const ip = clientIP || 'unknown';
         this.upsertStmt.run({
             $token: token,
             $sid: null, // 还没登录
             $cookies: JSON.stringify(cookies),
             $pt: null,
             $exec: execution,
-            $ua: 'PC',
+            $ua: `${ua} | ip:${ip}`,
             $created: Date.now(),
             $updated: Date.now()
         });

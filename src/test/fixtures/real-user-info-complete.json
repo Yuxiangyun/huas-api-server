@@ -1,0 +1,22 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "username": "202401001",
+    "attributes": {
+      "userName": "测试学生",
+      "organizationName": "计算机科学与技术2024-1班",
+      "identityTypeName": "学生",
+      "organizationCode": "CS2024-1",
+      "email": "test@example.edu.cn",
+      "phone": "13800138000",
+      "studentType": "本科生",
+      "grade": "2024",
+      "major": "计算机科学与技术",
+      "college": "计算机学院",
+      "idCard": "320***********1234",
+      "enrollmentDate": "2024-09-01",
+      "expectedGraduationDate": "2028-06-30"
+    }
+  }
+}

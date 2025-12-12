@@ -64,7 +64,7 @@ export class Scheduler {
             loggerInstance.info("清理不活跃会话", { count: inactiveRes.changes, days: BUSINESS_CONFIG.INACTIVE_SESSION_TIMEOUT });
         }
 
-        // 3. 清理过期缓存数据
+        // 3. 清理过期缓存数据（按统一超时）
         const cacheTimeout = BUSINESS_CONFIG.CACHE_EXPIRY_DAYS * ONE_DAY;
         const cacheRes = db.run(`
             DELETE FROM data_cache 

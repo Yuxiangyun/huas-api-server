@@ -5,7 +5,7 @@
  * 运行方式：bun src/test/full_flow.test.ts
  */
 
-import { db } from '../db/index';
+import { db } from '../db';
 import { SessionRepo, sessionRepo } from '../db/SessionRepo';
 import { CacheRepo, dataCacheRepo } from '../db/CacheRepo';
 import { UserRepo, userRepo } from '../db/UserRepo';

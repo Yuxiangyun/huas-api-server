@@ -24,7 +24,7 @@ export interface UserSession {
 // 数据库：缓存表结构
 export interface DbCache {
     student_id: string;
-    type: 'SCHEDULE' | 'ECARD' | 'USER_INFO';
+    type: 'SCHEDULE' | 'ECARD' | 'USER_INFO' | 'GRADES';
     data: string;           // JSON 字符串
     updated_at: number;
 }
@@ -53,4 +53,37 @@ export interface IUserInfo {
     className: string;
     identity: string;
     organizationCode: string;
+}
+
+// 业务实体：成绩
+export interface IGradeItem {
+    term: string;
+    courseCode: string;
+    courseName: string;
+    groupName: string;
+    score: number | null;
+    scoreText: string;
+    pass: boolean | null;
+    flag: string;
+    credit: number | null;
+    totalHours: number | null;
+    gpa: number | null;
+    retakeTerm: string;
+    examMethod: string;
+    examNature: string;
+    courseAttribute: string;
+    courseNature: string;
+    courseCategory: string;
+}
+
+export interface IGradeSummary {
+    totalCourses: number | null;
+    totalCredits: number | null;
+    averageGpa: number | null;
+    averageScore: number | null;
+}
+
+export interface IGradeList {
+    summary: IGradeSummary;
+    items: IGradeItem[];
 }
