@@ -7,6 +7,7 @@ import * as cheerio from 'cheerio';
 import type { ICourse } from '../types';
 import type { DataParser } from '../services/BaseService';
 import loggerInstance from '../core/utils/Logger';
+import { SessionExpiredError } from '../core/utils/errors';
 
 /** 课程表原始数据类型 */
 export type ScheduleRawData = string;
@@ -54,7 +55,8 @@ class ScheduleParserImpl implements DataParser<ScheduleRawData, ScheduleData> {
         
         // 警告：未找到表格行
         if (rows.length === 0) {
-            loggerInstance.warn("课程表解析警告：未找到表格行");
+            loggerInstance.warn("课程表解析警告：未找到表格行，可能会话失效");
+            throw new SessionExpiredError("SCHEDULE_EMPTY");
         }
 
         // 解析每一行

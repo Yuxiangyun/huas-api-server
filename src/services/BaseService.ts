@@ -131,9 +131,14 @@ export abstract class BaseService {
             if (!data) {
                 throw new Error(`数据解析失败: ${type}`);
             }
+
+            const isEmptyGrade = type === 'GRADES' && Array.isArray((data as any).items) && (data as any).items.length === 0;
+            if (isEmptyGrade) {
+                loggerInstance.warn("成绩数据为空，跳过缓存", { userId: userId.substring(0, 8) });
+            }
             
-            // 写入缓存（禁用或 ttl<=0 时不写）
-            if (!disableCache && ttl > 0) {
+            // 写入缓存（禁用或 ttl<=0 或成绩为空时不写）
+            if (!disableCache && ttl > 0 && !isEmptyGrade) {
                 this.cacheRepo.set(userId, type, data);
             }
             

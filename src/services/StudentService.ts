@@ -80,8 +80,9 @@ export class StudentService extends BaseService {
         const result = await this.fetchData(
             {
                 type: 'GRADES',
-                forceRefresh: refresh,
-                ttl: BUSINESS_CONFIG.GRADES_TTL
+                forceRefresh: true,
+                ttl: 0,
+                disableCache: true
             },
             () => this.client.fetchGradesRaw(),
             GradeParser
@@ -98,8 +99,9 @@ export class StudentService extends BaseService {
         const result = await this.fetchData(
             {
                 type: 'SCHEDULE',
-                forceRefresh: refresh,
-                ttl: BUSINESS_CONFIG.SCHEDULE_TTL
+                forceRefresh: true,
+                ttl: 0,
+                disableCache: true
             },
             () => this.client.fetchScheduleRaw(),
             ScheduleParser
@@ -116,8 +118,9 @@ export class StudentService extends BaseService {
         const result = await this.fetchData(
             {
                 type: 'ECARD',
-                forceRefresh: true,  // 强制刷新
-                ttl: 0     // 无缓存
+                forceRefresh: true,
+                ttl: 0,
+                disableCache: true
             },
             () => this.client.fetchECardRaw(),
             ECardParser
