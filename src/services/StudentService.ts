@@ -80,9 +80,8 @@ export class StudentService extends BaseService {
         const result = await this.fetchData(
             {
                 type: 'GRADES',
-                forceRefresh: true,
-                ttl: 0,
-                disableCache: true
+                forceRefresh: refresh,
+                ttl: BUSINESS_CONFIG.GRADES_TTL
             },
             () => this.client.fetchGradesRaw(),
             GradeParser
@@ -99,9 +98,8 @@ export class StudentService extends BaseService {
         const result = await this.fetchData(
             {
                 type: 'SCHEDULE',
-                forceRefresh: true,
-                ttl: 0,
-                disableCache: true
+                forceRefresh: refresh,
+                ttl: BUSINESS_CONFIG.SCHEDULE_TTL
             },
             () => this.client.fetchScheduleRaw(),
             ScheduleParser
