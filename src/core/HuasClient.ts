@@ -55,8 +55,8 @@ export class HuasClient {
         return await this.authApi.getCaptcha();
     }
 
-    async login(username: string, password: string, captcha: string): Promise<boolean> {
-        if (!this.execution) return false;
+    async login(username: string, password: string, captcha: string): Promise<{ success: boolean; needCaptcha?: boolean; message?: string; }> {
+        if (!this.execution) return { success: false, needCaptcha: true, message: 'execution_missing' };
 
         const result = await this.authApi.login(username, password, captcha, this.execution);
         
@@ -72,9 +72,12 @@ export class HuasClient {
             // 3. 激活教务 Session
             await this.authApi.activateJwSession();
 
-            return true;
+            return { success: true };
         }
-        return false;
+        if (result.needCaptcha) {
+            loggerInstance.warn("CAS 登录失败，需要验证码", { userId: this.userId });
+        }
+        return { success: false, needCaptcha: result.needCaptcha };
     }
 
     // === 数据获取 ===

@@ -80,12 +80,16 @@ export function registerAuthRoutes<E extends { Variables: { userId: string; clie
         try {
             loggerInstance.info("用户尝试登录", { username: maskStudentId(username), sessionId: maskToken(sessionId) });
             const service = new StudentService(sessionId);
-            const success = await service.login(username, password, code);
+            const result = await service.login(username, password, code || '');
             
-            if (success) {
+            if (result.success) {
                 loggerInstance.info("用户登录成功", { username: maskStudentId(username) });
                 return c.json({ code: 200, msg: "登录成功", token: sessionId });
             } else {
+                if (result.needCaptcha) {
+                    loggerInstance.warn("用户登录需要验证码", { username: maskStudentId(username), sessionId: maskToken(sessionId) });
+                    return c.json({ code: 401, msg: "登录失败：学号或密码可能错误，请输入验证码后再试", action: "NEED_CAPTCHA" });
+                }
                 loggerInstance.warn("用户登录失败", { username: maskStudentId(username) });
                 return c.json({ code: 401, msg: "学号、密码或验证码错误" });
             }

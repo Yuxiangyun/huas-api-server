@@ -77,7 +77,7 @@ export interface LoginParams {
     sessionId: string;
     username: string;
     password: string;
-    code: string;
+    code?: string;
 }
 
 /** 验证结果接口 */
@@ -124,13 +124,14 @@ export function validateLoginParams(params: any): ValidationResult {
         return { valid: false, error: '密码长度应为6-50位' };
     }
     
-    if (!code || typeof code !== 'string') {
-        return { valid: false, error: '验证码不能为空' };
-    }
-    
-    // 验证码通常为4位字母数字
-    if (!/^[A-Za-z0-9]{4,6}$/.test(code)) {
-        return { valid: false, error: '验证码格式错误' };
+    // 验证码按需校验：只有传入时才校验格式
+    if (code !== undefined && code !== null && code !== '') {
+        if (typeof code !== 'string') {
+            return { valid: false, error: '验证码格式错误' };
+        }
+        if (!/^[A-Za-z0-9]{4,6}$/.test(code)) {
+            return { valid: false, error: '验证码格式错误' };
+        }
     }
     
     return { valid: true };

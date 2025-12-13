@@ -164,11 +164,12 @@ export class StudentService extends BaseService {
      * @param password 密码
      * @param captcha 验证码
      */
-    async login(username: string, password: string, captcha: string): Promise<boolean> {
+    async login(username: string, password: string, captcha: string): Promise<{ success: boolean; needCaptcha?: boolean; }> {
         loggerInstance.info("开始登录流程", { username: maskStudentId(username) });
         
         try {
-            const success = await this.client.login(username, password, captcha);
+            const result = await this.client.login(username, password, captcha);
+            const success = result.success;
             
             if (success) {
                 const sessionRepoInstance = new SessionRepo();
@@ -186,14 +187,17 @@ export class StudentService extends BaseService {
                     this.client.portalToken || ''
                 );
                 loggerInstance.info("登录成功", { studentId: maskStudentId(studentId) });
-                return true;
+                return { success: true };
             }
             
             loggerInstance.warn("登录验证失败", { username: maskStudentId(username) });
-            return false;
+            if (result.needCaptcha) {
+                loggerInstance.warn("登录失败：上游要求验证码", { username: maskStudentId(username) });
+            }
+            return { success: false, needCaptcha: result.needCaptcha };
         } catch (e: any) {
             loggerInstance.error("登录过程中发生错误", { error: e.message });
-            return false;
+            return { success: false };
         }
     }
 }

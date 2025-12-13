@@ -86,13 +86,13 @@
                 <input type="password" id="password" 
                     class="w-full text-base bg-slate-50 border-2 border-ink rounded-lg p-3 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal" placeholder="请输入智慧文理密码">
             </div>
-            <div>
-                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">验证码</label>
+            <div id="captchaBlock" class="hidden">
+                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">验证码（需要时）</label>
                 <div class="flex gap-2 h-[50px]">
                     <input type="text" id="captcha" placeholder="ABCD" 
                         class="flex-1 min-w-0 text-base bg-slate-50 border-2 border-ink rounded-lg p-3 font-bold uppercase focus:outline-none focus:border-popTeal focus:shadow-hard transition-all">
                     
-                    <div class="w-28 border-2 border-ink rounded-lg bg-slate-200 cursor-pointer overflow-hidden relative group shrink-0 active:scale-95 transition-transform" onclick="initCaptcha()">
+                    <div class="w-28 border-2 border-ink rounded-lg bg-slate-200 cursor-pointer overflow-hidden relative group shrink-0 active:scale-95 transition-transform" onclick="initCaptcha(true)">
                         <img id="captchaImg" class="w-full h-full object-fill hidden">
                         <div id="captchaText" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400">点击刷新</div>
                     </div>
@@ -206,6 +206,7 @@
         const API_BASE = ''; 
         
         let currentSessionId = '';
+        let requireCaptcha = false;
         let globalToken = localStorage.getItem('huas_token') || '';
         const panelLoaded = { schedule: false, grades: false };
         const SAVED_CRED_KEY = 'huas_saved_cred';
@@ -222,7 +223,7 @@
             initCaptcha();
         }
 
-        async function initCaptcha() {
+        async function initCaptcha(forceShow = false) {
             setLoading(true);
             try {
                 const res = await fetch(`${API_BASE}/auth/captcha`, { cache: 'no-store' });
@@ -233,6 +234,12 @@
                     img.src = 'data:image/png;base64,' + json.data.image;
                     img.classList.remove('hidden');
                     document.getElementById('captchaText').classList.add('hidden');
+                    if (forceShow) {
+                        requireCaptcha = true;
+                        document.getElementById('captchaBlock').classList.remove('hidden');
+                    } else if (!requireCaptcha) {
+                        document.getElementById('captchaBlock').classList.add('hidden');
+                    }
                 } else {
                     alert('验证码获取失败: ' + json.msg);
                 }
@@ -247,14 +254,19 @@
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
             const c = document.getElementById('captcha').value;
-            if(!u || !p || !c) return alert('请填写完整');
+            if(!u || !p) return alert('请填写学号和密码');
+            if(requireCaptcha && !c) return alert('请输入验证码');
 
             setLoading(true);
             try {
+                const payload = { sessionId: currentSessionId, username: u, password: p };
+                if (requireCaptcha || c) {
+                    payload.code = c;
+                }
                 const res = await fetch(`${API_BASE}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId: currentSessionId, username: u, password: p, code: c })
+                    body: JSON.stringify(payload)
                 });
                 const json = await res.json();
                 if (json.code === 200) {
@@ -262,9 +274,15 @@
                     localStorage.setItem('huas_token', globalToken);
                     saveCredentialsIfNeeded(u, p);
                     loadAllData();
+                } else if (json.action === 'NEED_CAPTCHA') {
+                    requireCaptcha = true;
+                    document.getElementById('captchaBlock').classList.remove('hidden');
+                    document.getElementById('captcha').value = '';
+                    initCaptcha(true);
+                    alert(json.msg || '登录失败，可能学号/密码错误，请输入验证码后再试');
                 } else {
                     alert('登录失败: ' + json.msg);
-                    initCaptcha();
+                    initCaptcha(requireCaptcha);
                 }
             } catch (e) {
                 alert('登录请求错误');

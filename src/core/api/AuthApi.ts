@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { NetworkSession } from '../network/NetworkSession';
 import { CryptoHelper } from '../utils/CryptoHelper';
+import loggerInstance from '../utils/Logger';
 
 const URLS = {
     login: "https://cas.huas.edu.cn/cas/login",
@@ -41,7 +42,12 @@ export class AuthApi {
         params.append('execution', execution);
         params.append('_eventId', 'submit');
         params.append('submit1', 'Login1');
-        params.append('captcha', captcha);
+        // 首次尝试明确告知失败次数为 0，避免默认 -1 触发验证码
+        params.append('failN', '0');
+        // 只有用户真实输入了验证码才带上
+        if (captcha && captcha.trim()) {
+            params.append('captcha', captcha.trim());
+        }
 
         const loginUrl = `${URLS.login}?service=${encodeURIComponent(URLS.servicePortal)}`;
         const res = await this.session.request(loginUrl, { 
@@ -56,7 +62,20 @@ export class AuthApi {
                 return { success: true, redirectUrl: loc };
             }
         }
-        return { success: false };
+        const text = await res.text();
+        // 只有出现明确的“验证码不能为空/错误/失效/不正确”提示才认为需要验证码
+        let needCaptcha = /验证码(不能为空|错误|失效|不正确)/i.test(text) || /captcha\s+(error|invalid|required)/i.test(text.toLowerCase());
+        // 如果本次已提交验证码但仍命中上述提示，则视为普通失败，避免前端死循环要求验证码
+        if (needCaptcha && captcha && captcha.trim()) {
+            needCaptcha = false;
+        }
+        const snippet = text.slice(0, 200);
+        if (needCaptcha) {
+            loggerInstance.warn("CAS返回提示需要验证码", { snippet });
+        } else {
+            loggerInstance.debug("CAS登录失败但未命中验证码提示", { status: res.status, snippet });
+        }
+        return { success: false, needCaptcha };
     }
 
     async activateJwSession() {
