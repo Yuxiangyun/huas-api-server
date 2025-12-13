@@ -63,6 +63,3 @@ scripts/server-update.sh
 # IDE 配置
 .cursor/
 .idea/
-
-# 前端静态文件（如果是纯 API 项目）
-index.html
