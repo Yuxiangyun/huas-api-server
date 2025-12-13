@@ -131,7 +131,7 @@
             <div class="text-white border-2 border-transparent rounded-xl shadow-hard p-4 flex flex-col justify-between relative overflow-hidden" style="background: radial-gradient(circle at 20% 20%, #1f7a8c 0%, #0f3d3e 55%, #0b2b2c 100%);">
                 <div class="absolute -right-6 -top-6 w-28 h-28 bg-white/10 rounded-full blur-2xl"></div>
                 <div class="flex justify-between items-start z-10">
-                    <span class="text-[10px] font-bold tracking-widest opacity-80 text-[#9ee0ff]">E-CARD</span>
+                    <span class="text-[10px] font-bold tracking-widest opacity-80 text-[#9ee0ff]">校园卡余额</span>
                     <span class="px-2 py-0.5 border border-[#9ee0ff]/50 bg-[#9ee0ff]/15 rounded-full text-[10px] font-bold text-[#9ee0ff]" id="ecStatus">--</span>
                 </div>
                 <div class="z-10 mt-1 flex justify-between items-end">
@@ -464,11 +464,14 @@
                                     <div class="font-black text-[10px] text-ink leading-tight line-clamp-3 z-10 relative mb-1">
                                         ${course.name}
                                     </div>
+                                    ${course.location ? `
                                     <div class="flex justify-start z-10 relative">
-                                        <div class="inline-flex items-center bg-white/60 border border-ink/10 px-1 py-0.5 rounded-[4px] text-[8px] font-bold text-ink/80 backdrop-blur-sm max-w-full">
-                                            <span class="truncate">📍${course.location.replace('校本部', '')}</span>
+                                        <div class="inline-flex items-start bg-white/70 border border-ink/10 px-1.5 py-1 rounded-lg text-[8px] font-bold text-ink/80 backdrop-blur-sm max-w-full leading-tight flex-col">
+                                            <span class="break-words">${course.location.replace('校本部', '').replace(/(楼)[A-Za-z]?\d+.*/, '$1')}</span>
+                                            <span class="text-[9px] font-black">${(course.location.match(/(楼)([A-Za-z]?\d+)/) || [,'',''])[2]}</span>
                                         </div>
                                     </div>
+                                    ` : ''}
                                 </div>
                             `;
                         });
