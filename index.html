@@ -207,6 +207,10 @@
         
         let currentSessionId = '';
         let requireCaptcha = false;
+        let isRelogging = false;
+        let reauthPromise = null;
+        let reauthFailedNotified = false;
+        const log = (...args) => console.log('[UI]', ...args);
         let globalToken = localStorage.getItem('huas_token') || '';
         const panelLoaded = { schedule: false, grades: false };
         const SAVED_CRED_KEY = 'huas_saved_cred';
@@ -256,38 +260,63 @@
             const c = document.getElementById('captcha').value;
             if(!u || !p) return alert('请填写学号和密码');
             if(requireCaptcha && !c) return alert('请输入验证码');
+            await performLogin(u, p, c, false);
+        }
 
-            setLoading(true);
+        async function performLogin(username, password, captcha, quiet = false) {
+            log('performLogin', { quiet, requireCaptcha });
+            if (!quiet) setLoading(true);
             try {
-                const payload = { sessionId: currentSessionId, username: u, password: p };
-                if (requireCaptcha || c) {
-                    payload.code = c;
-                }
+                const payload = { sessionId: currentSessionId, username, password };
+                if (requireCaptcha || captcha) payload.code = captcha;
+
                 const res = await fetch(`${API_BASE}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 const json = await res.json();
+                log('login response', json);
                 if (json.code === 200) {
                     globalToken = json.token;
                     localStorage.setItem('huas_token', globalToken);
-                    saveCredentialsIfNeeded(u, p);
-                    loadAllData();
-                } else if (json.action === 'NEED_CAPTCHA') {
+                    reauthFailedNotified = false;
+                    saveCredentialsIfNeeded(username, password);
+                    if (!quiet) {
+                        document.getElementById('loginCard').classList.add('hidden');
+                        document.getElementById('dataArea').classList.remove('hidden');
+                        await loadAllData();
+                    }
+                    return true;
+                }
+
+                if (json.action === 'NEED_CAPTCHA') {
+                    log('login need captcha', json.msg);
                     requireCaptcha = true;
                     document.getElementById('captchaBlock').classList.remove('hidden');
                     document.getElementById('captcha').value = '';
                     initCaptcha(true);
-                    alert(json.msg || '登录失败，可能学号/密码错误，请输入验证码后再试');
+                    if (!quiet) alert(json.msg || '登录失败，可能学号/密码错误，请输入验证码后再试');
+                } else if (json.code === 400 && json.msg && json.msg.includes('会话ID无效')) {
+                    log('login invalid sessionId, refreshing captcha session');
+                    await initCaptcha(false);
+                    if (quiet) {
+                        // 静默模式下再尝试一次
+                        return performLogin(username, password, '', true);
+                    }
+                    alert('会话已失效，已刷新验证码，请重试');
                 } else {
-                    alert('登录失败: ' + json.msg);
+                    log('login failed', json.msg);
+                    if (!quiet) alert('登录失败: ' + json.msg);
                     initCaptcha(requireCaptcha);
                 }
+                return false;
             } catch (e) {
-                alert('登录请求错误');
+                log('login error', e);
+                if (!quiet) alert('登录请求错误');
+                return false;
             } finally {
-                setLoading(false);
+                if (!quiet) setLoading(false);
             }
         }
 
@@ -317,13 +346,7 @@
                 renderUser(json.data);
                 panelLoaded.user = true;
             } catch (e) {
-                if (e.message === 'SESSION_EXPIRED') {
-                    alert('登录已过期，请重新登录');
-                    handleLogout();
-                } else {
-                    alert('用户信息获取失败');
-                    console.error(e);
-                }
+                await handleFetchError(e, () => loadUser(refresh, false));
             } finally {
                 if (withSpinner) setLoading(false);
             }
@@ -351,13 +374,8 @@
                 renderEcard(json.data);
                 panelLoaded.ecard = true;
             } catch (e) {
-                if (e.message === 'SESSION_EXPIRED') {
-                    alert('登录已过期，请重新登录');
-                    handleLogout();
-                } else {
-                    alert('一卡通获取失败');
-                    console.error(e);
-                }
+                log('loadEcard error', e);
+                await handleFetchError(e, () => loadEcard(refresh, false), '一卡通获取失败');
             } finally {
                 if (withSpinner) setLoading(false);
             }
@@ -402,13 +420,8 @@
                 renderSchedule(json.data);
                 panelLoaded.schedule = true;
             } catch (e) {
-                if (e.message === 'SESSION_EXPIRED') {
-                    alert('登录已过期，请重新登录');
-                    handleLogout();
-                } else {
-                    alert('课表获取失败');
-                    console.error(e);
-                }
+                log('loadSchedule error', e);
+                await handleFetchError(e, () => loadSchedule(refresh, false), '课表获取失败');
             } finally {
                 if (withSpinner) setLoading(false);
             }
@@ -615,11 +628,21 @@
             });
         }
 
-        function handleLogout() {
+        function handleLogout(preserveCreds = true) {
             localStorage.removeItem('huas_token');
             globalToken = '';
             panelLoaded.schedule = panelLoaded.grades = panelLoaded.ecard = panelLoaded.user = false;
-            location.reload();
+            requireCaptcha = false;
+            document.getElementById('captcha').value = '';
+            document.getElementById('captchaBlock').classList.add('hidden');
+            // 保留已保存的账号密码，回到登录卡片并填充
+            document.getElementById('dataArea').classList.add('hidden');
+            document.getElementById('loginCard').classList.remove('hidden');
+            if (!preserveCreds) {
+                localStorage.removeItem(SAVED_CRED_KEY);
+            }
+            loadSavedCredentials();
+            initCaptcha(false);
         }
 
         function setLoading(isLoading) {
@@ -630,12 +653,18 @@
         function loadSavedCredentials() {
             try {
                 const saved = localStorage.getItem(SAVED_CRED_KEY);
-                if (!saved) return;
+                if (!saved) {
+                    log('no saved credentials found');
+                    return;
+                }
                 const { username, password, remember } = JSON.parse(saved);
+                log('load saved credentials', { hasUser: !!username, hasPass: !!password, remember });
                 if (username) document.getElementById('username').value = username;
                 if (password) document.getElementById('password').value = password;
                 if (remember) document.getElementById('rememberMe').checked = true;
-            } catch {}
+            } catch (e) {
+                console.error('loadSavedCredentials error', e);
+            }
         }
 
         function saveCredentialsIfNeeded(username, password) {
@@ -667,6 +696,52 @@
                 togglePanel('grades', true);
             }
             loadGrades(true);
+        }
+
+        // 统一处理 401：尝试用本地缓存自动重登，失败则提示并登出
+        async function handleFetchError(error, retryFn, fallbackMsg = '请求失败') {
+            if (error.message === 'SESSION_EXPIRED') {
+                log('session expired, start reauth');
+                if (!reauthPromise) {
+                    reauthPromise = tryAutoRelogin();
+                }
+                const reloginOk = await reauthPromise.catch(() => false);
+                reauthPromise = null;
+                if (reloginOk && typeof retryFn === 'function') {
+                    log('reauth success, retrying');
+                    return retryFn();
+                }
+                if (!reauthFailedNotified) {
+                    alert('登录已过期，请重新登录');
+                    reauthFailedNotified = true;
+                }
+                // 只退回登录卡片，保留已记住的账号密码，方便再次输入验证码
+                handleLogout(true);
+            } else {
+                alert(fallbackMsg);
+                console.error(error);
+            }
+        }
+
+        function getSavedCredentials() {
+            try {
+                const saved = localStorage.getItem(SAVED_CRED_KEY);
+                return saved ? JSON.parse(saved) : null;
+            } catch { return null; }
+        }
+
+        async function tryAutoRelogin() {
+            if (isRelogging) return false;
+            const saved = getSavedCredentials();
+            if (!saved || !saved.username || !saved.password) return false;
+            isRelogging = true;
+            currentSessionId = '';
+            requireCaptcha = false;
+            // 重置验证码会话但不展示输入框
+            await initCaptcha(false);
+            const ok = await performLogin(saved.username, saved.password, '', true);
+            isRelogging = false;
+            return ok;
         }
     </script>
 </body>
