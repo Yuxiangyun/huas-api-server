@@ -6,7 +6,6 @@ import * as cheerio from 'cheerio';
 import type { DataParser } from '../services/BaseService';
 import type { IGradeItem, IGradeList, IGradeSummary } from '../types';
 import loggerInstance from '../core/utils/Logger';
-import { SessionExpiredError } from '../core/utils/errors';
 
 /** 成绩原始数据类型 */
 export type GradeRawData = string;
@@ -68,10 +67,9 @@ class GradeParserImpl implements DataParser<GradeRawData, IGradeList> {
 
         const summary = this.extractSummary($);
 
-        // 如果完全解析不到数据，视为会话失效或接口异常，触发重登
+        // 如果完全解析不到数据，仅记录警告，不抛出会话过期，避免误触登录失败
         if (items.length === 0 && !summary.totalCourses && !summary.totalCredits) {
-            loggerInstance.warn("成绩解析结果为空，可能会话失效");
-            throw new SessionExpiredError("GRADE_EMPTY");
+            loggerInstance.warn("成绩解析结果为空");
         }
 
         loggerInstance.debug("成绩解析完成", { count: items.length, summary });
