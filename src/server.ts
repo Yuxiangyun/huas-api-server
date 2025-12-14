@@ -14,6 +14,7 @@ import { createPerformanceMiddleware } from './core/middleware/MiddlewareFactory
 import { registerApiRoutes } from './routes/api.routes';
 import { registerAuthRoutes } from './routes/auth.routes';
 import systemRoutes from './routes/system.routes';
+import proxyRoutes from './routes/proxy.routes';
 
 // 应用环境类型定义
 type HonoEnv = { Variables: { userId: string; clientIP: string; } };
@@ -45,6 +46,9 @@ registerApiRoutes(app);
 
 // 注册认证路由
 registerAuthRoutes(app);
+
+// 反向代理上游（仅匹配指定前缀）
+app.route('/', proxyRoutes);
 
 // 注册系统路由
 app.route('/', systemRoutes);

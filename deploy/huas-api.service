@@ -25,6 +25,10 @@ ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/huas-api /var/log/huas-api
 
+# 允许以非 root 绑定 80/443 等低端口（需要对 bun 设置 setcap）
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
 # 资源限制
 LimitNOFILE=65536
 LimitNPROC=512
