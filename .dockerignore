@@ -1,0 +1,14 @@
+# Ignore unnecessary files for Docker build context
+.git
+.gitignore
+node_modules
+npm-debug.log
+pnpm-lock.yaml
+yarn.lock
+*.log
+logs
+backups
+huas.sqlite*
+.DS_Store
+deploy
+.vscode

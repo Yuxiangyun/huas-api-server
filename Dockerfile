@@ -3,9 +3,9 @@ FROM oven/bun:1.1 as base
 
 WORKDIR /app
 
-# Install deps first (better layer cache)
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+# Install deps first (better layer cache). Skip bun.lock parsing issues by only using package.json.
+COPY package.json ./
+RUN bun install --production
 
 # Copy the rest of the source (includes SQLite schema/data if provided)
 COPY . .
