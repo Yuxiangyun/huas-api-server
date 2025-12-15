@@ -4,7 +4,6 @@
  */
 import { Hono } from 'hono';
 import { statsRepo } from '../db/StatsRepo';
-import { performanceMonitor } from '../core/utils/PerformanceMonitor';
 import loggerInstance from '../core/utils/Logger';
 import { createAdminAuthMiddleware } from '../core/middleware/MiddlewareFactory';
 
@@ -23,16 +22,6 @@ app.get('/health', (c) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime()
     });
-});
-
-/**
- * 性能指标接口
- * GET /metrics
- * 返回系统性能指标
- */
-app.get('/metrics', (c) => {
-    const metrics = performanceMonitor.getMetrics();
-    return c.json(metrics);
 });
 
 // ========== /system/* 路由 ==========

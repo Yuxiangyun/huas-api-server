@@ -10,6 +10,10 @@ Group=www-data
 WorkingDirectory=/opt/huas-api
 Environment="NODE_ENV=production"
 Environment="PORT=12103"
+# 监控端口（默认 13001），如需关闭设为 0
+Environment="MONITOR_PORT=13001"
+# 监控监听地址（默认 0.0.0.0，若仅本机访问可设 127.0.0.1）
+Environment="MONITOR_HOST=0.0.0.0"
 EnvironmentFile=/opt/huas-api/.env.production
 ExecStart=/usr/local/bin/bun run start
 Restart=always

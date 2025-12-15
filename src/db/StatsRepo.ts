@@ -21,10 +21,10 @@ export interface UserStats {
  * 会话统计数据接口
  */
 export interface SessionStats {
-    totalSessions: number;        // 总会话数
-    activeSessions: number;       // 活跃会话数（已登录）
-    tempSessions: number;         // 临时会话数（未登录）
-    multiDeviceUsers: number;     // 多设备登录用户数
+    totalSessions: number;        // 总会话数（按学号去重）
+    activeSessions: number;       // 活跃会话数（已登录，按学号去重）
+    tempSessions: number;         // 临时会话数（未登录，按 token 计数）
+    multiDeviceUsers: number;     // 多设备登录用户数（同学号多 token）
 }
 
 /**
@@ -79,19 +79,28 @@ export class StatsRepo {
             WHERE last_active_at >= ?
         `).get(oneMonthAgo) as { count: number };
 
-        // 今日新增用户数（假设有 created_at 字段，当前版本暂时返回 0）
-        const newToday = 0;
-        const newWeek = 0;
-        const newMonth = 0;
+        // 新增用户数（使用 created_at 计算）
+        const newToday = db.prepare(`
+            SELECT COUNT(*) as count FROM users 
+            WHERE created_at IS NOT NULL AND created_at >= ?
+        `).get(oneDayAgo) as { count: number };
+        const newWeek = db.prepare(`
+            SELECT COUNT(*) as count FROM users 
+            WHERE created_at IS NOT NULL AND created_at >= ?
+        `).get(oneWeekAgo) as { count: number };
+        const newMonth = db.prepare(`
+            SELECT COUNT(*) as count FROM users 
+            WHERE created_at IS NOT NULL AND created_at >= ?
+        `).get(oneMonthAgo) as { count: number };
 
         return {
             totalUsers: totalUsers.count,
             activeUsersToday: activeToday.count,
             activeUsersWeek: activeWeek.count,
             activeUsersMonth: activeMonth.count,
-            newUsersToday: newToday,
-            newUsersWeek: newWeek,
-            newUsersMonth: newMonth
+            newUsersToday: newToday.count,
+            newUsersWeek: newWeek.count,
+            newUsersMonth: newMonth.count
         };
     }
 
@@ -99,16 +108,19 @@ export class StatsRepo {
      * 获取会话统计数据
      */
     getSessionStats(): SessionStats {
-        // 总会话数
-        const total = db.prepare(`SELECT COUNT(*) as count FROM sessions`).get() as { count: number };
-
-        // 活跃会话数（已登录）
-        const active = db.prepare(`
-            SELECT COUNT(*) as count FROM sessions 
+        // 总会话数（去重学号）
+        const total = db.prepare(`
+            SELECT COUNT(DISTINCT student_id) as count FROM sessions 
             WHERE student_id IS NOT NULL
         `).get() as { count: number };
 
-        // 临时会话数（未登录）
+        // 活跃会话数（已登录，去重学号）
+        const active = db.prepare(`
+            SELECT COUNT(DISTINCT student_id) as count FROM sessions 
+            WHERE student_id IS NOT NULL
+        `).get() as { count: number };
+
+        // 临时会话数（未登录，按 token 计数）
         const temp = db.prepare(`
             SELECT COUNT(*) as count FROM sessions 
             WHERE student_id IS NULL

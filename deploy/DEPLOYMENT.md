@@ -134,8 +134,10 @@ sudo journalctl -u huas-api -f
 # 健康检查（生产环境默认端口 12103）
 curl http://localhost:12103/health
 
-# 性能指标
-curl http://localhost:12103/metrics
+# 监控/指标（独立监控端口，默认 13001，可在 service 中覆盖 MONITOR_PORT/MONITOR_HOST）
+curl http://localhost:13001/status.json
+curl http://localhost:13001/metrics.json
+open http://localhost:13001/dashboard
 ```
 
 ## Nginx 反向代理配置

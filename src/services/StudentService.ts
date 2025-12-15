@@ -180,12 +180,15 @@ export class StudentService extends BaseService {
                 this.client.userId = studentId;
 
                 const currentSession = this.client.exportState();
-                sessionRepoInstance.bindUser(
+                const bindOk = sessionRepoInstance.bindUser(
                     this.token, 
                     studentId, 
                     currentSession.cookies, 
                     this.client.portalToken || ''
                 );
+                if (!bindOk) {
+                    throw new Error("SESSION_NOT_FOUND");
+                }
                 loggerInstance.info("登录成功", { studentId: maskStudentId(studentId) });
                 return { success: true };
             }

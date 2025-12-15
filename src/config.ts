@@ -7,6 +7,10 @@
 export const SERVER_CONFIG = {
     /** 服务器端口 */
     PORT: parseInt(process.env.PORT || '3000'),
+    /** 性能监控端口（0 关闭，默认 13001） */
+    MONITOR_PORT: parseInt(process.env.MONITOR_PORT || '13001'),
+    /** 性能监控监听地址（默认 0.0.0.0，可改为 127.0.0.1 收敛访问） */
+    MONITOR_HOST: process.env.MONITOR_HOST || '0.0.0.0',
     
     /** 允许的 CORS 来源列表 */
     CORS_ORIGINS: (process.env.CORS_ORIGINS || 'http://localhost:3000').split(','),

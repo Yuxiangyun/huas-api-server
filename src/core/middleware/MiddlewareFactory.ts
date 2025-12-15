@@ -76,6 +76,9 @@ export function createAuthMiddleware(options?: {
             loggerInstance.warn("会话不存在", { token: maskToken(token), ip: clientIP });
             return c.json({ code: 401, msg: "会话已过期，请重新登录" }, 401 as any);
         }
+
+        // 刷新活跃时间，防止活跃会话被清理
+        sessionRepo.touch(token, session.student_id || undefined);
         
         // 速率限制
         if (enableRateLimit) {

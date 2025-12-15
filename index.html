@@ -510,6 +510,7 @@
                 if (json.code && json.code !== 200) {
                     throw new Error(json.msg || '成绩获取失败');
                 }
+                console.info('[UI] grades response', { code: json.code, itemCount: json?.data?.items?.length || 0 });
                 renderGrades(json.data);
                 panelLoaded.grades = true;
             } catch (e) {

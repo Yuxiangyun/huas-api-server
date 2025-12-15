@@ -206,8 +206,8 @@ describe('管理员 API E2E 测试', () => {
             expect(publicPaths.includes('/system/health')).toBe(true);
         });
         
-        test('/metrics 接口当前是公开的', () => {
-            // metrics 接口目前未加权限保护
+        test('监控接口当前是公开的（独立端口）', () => {
+            // 性能/状态接口迁移到监控端口（默认 13001），保持公开访问
             const isPublic = true;
             expect(isPublic).toBe(true);
         });

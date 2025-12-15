@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>服务器状态面板</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f6f7fb; color: #0f172a; }
+    header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    main { padding: 20px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; box-shadow: 0 10px 28px rgba(15,23,42,0.05); }
+    .card h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+    .number { font-size: 26px; font-weight: 800; color: #0f172a; }
+    .muted { color: #64748b; font-size: 12px; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 12px; overflow: auto; font-size: 12px; }
+    button { padding: 8px 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; font-weight: 700; }
+    button:hover { background: #f8fafc; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .pill { padding: 4px 8px; border-radius: 999px; background:#e2e8f0; font-weight:700; font-size:12px; }
+    .grid-raw { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div style="font-weight:800;font-size:18px;">服务器状态面板</div>
+      <div class="muted">汇总性能、健康、系统统计</div>
+    </div>
+    <div class="row">
+      <span id="updated" class="muted"></span>
+      <button onclick="refresh()">手动刷新</button>
+    </div>
+  </header>
+  <main>
+    <div class="card">
+      <h3>健康</h3>
+      <div class="number"><span id="healthStatus">--</span></div>
+      <div class="muted">uptime <span id="healthUptime">--</span> s</div>
+      <div class="muted">timestamp <span id="healthTs">--</span></div>
+    </div>
+    <div class="card">
+      <h3>请求</h3>
+      <div class="number"><span id="reqTotal">--</span></div>
+      <div class="muted">成功 <span id="reqSuccess">--</span> · 失败 <span id="reqError">--</span></div>
+      <div class="row" style="margin-top:8px;">
+        <span class="pill">QPS <span id="reqQps">--</span></span>
+        <span class="pill">1min <span id="req1m">--</span></span>
+        <span class="pill">5min <span id="req5m">--</span></span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>响应时间</h3>
+      <div class="number"><span id="respAvg">--</span> ms</div>
+      <div class="muted">p95 <span id="respP95">--</span> · p99 <span id="respP99">--</span></div>
+    </div>
+    <div class="card">
+      <h3>内存</h3>
+      <div class="number"><span id="memRss">--</span> MB</div>
+      <div class="muted">heapUsed <span id="memUsed">--</span> / <span id="memTotal">--</span> MB</div>
+    </div>
+    <div class="card">
+      <h3>CPU</h3>
+      <div class="number"><span id="cpuPct">--</span>%</div>
+      <div class="muted">user <span id="cpuUser">--</span> ms · system <span id="cpuSys">--</span> ms</div>
+    </div>
+    <div class="card">
+      <h3>系统统计</h3>
+      <div class="number" style="font-size:20px;">用户 <span id="statUsers">--</span></div>
+      <div class="muted">活跃(天/周/月) <span id="statActive">--</span></div>
+      <div class="muted">会话 总 <span id="statSess">--</span> / 临时 <span id="statTemp">--</span></div>
+      <div class="muted">缓存 总 <span id="statCache">--</span></div>
+    </div>
+    <div class="card">
+      <h3>主机</h3>
+      <div class="number" style="font-size:20px;">HOST <span id="hostName">--</span></div>
+      <div class="muted">平台 <span id="hostPlatform">--</span> / <span id="hostArch">--</span></div>
+      <div class="muted">Load <span id="load1">--</span> / <span id="load5">--</span> / <span id="load15">--</span></div>
+      <div class="muted">内存总量 <span id="memTotalHost">--</span> MB · 空闲 <span id="memFree">--</span> MB</div>
+    </div>
+    <div class="card">
+      <h3>进程</h3>
+      <div class="number" style="font-size:20px;">PID <span id="procPid">--</span></div>
+      <div class="muted">Node <span id="nodeVer">--</span> · Bun <span id="bunVer">--</span></div>
+      <div class="muted">环境 <span id="env">--</span></div>
+    </div>
+    <div class="card grid-raw">
+      <h3>原始数据</h3>
+      <pre id="raw">等待加载...</pre>
+    </div>
+  </main>
+  <script>
+    const fmt = (n) => Number(n).toLocaleString('en-US');
+    async function refresh() {
+      try {
+        const res = await fetch('/status.json', { cache: 'no-store' });
+        const data = await res.json();
+        const m = data.metrics || {}; const s = data.stats || {}; const h = data.health || {};
+        document.getElementById('healthStatus').textContent = h.status || '--';
+        document.getElementById('healthUptime').textContent = h.uptime || '--';
+        document.getElementById('healthTs').textContent = h.timestamp || '--';
+        document.getElementById('reqTotal').textContent = fmt(m.totalRequests || 0);
+        document.getElementById('reqSuccess').textContent = fmt(m.successRequests || 0);
+        document.getElementById('reqError').textContent = fmt(m.errorRequests || 0);
+        document.getElementById('reqQps').textContent = m.reqPerSec ?? '--';
+        document.getElementById('req1m').textContent = m.reqPerMin ?? '--';
+        document.getElementById('req5m').textContent = m.reqPer5Min ?? '--';
+        document.getElementById('respAvg').textContent = m.avgResponseTime ?? '--';
+        document.getElementById('respP95').textContent = m.p95ResponseTime ?? '--';
+        document.getElementById('respP99').textContent = m.p99ResponseTime ?? '--';
+        document.getElementById('memRss').textContent = m.memoryUsage?.rss ?? '--';
+        document.getElementById('memUsed').textContent = m.memoryUsage?.heapUsed ?? '--';
+        document.getElementById('memTotal').textContent = m.memoryUsage?.heapTotal ?? '--';
+        document.getElementById('cpuPct').textContent = m.cpuUsage?.percent ?? '--';
+        document.getElementById('cpuUser').textContent = m.cpuUsage?.user ?? '--';
+        document.getElementById('cpuSys').textContent = m.cpuUsage?.system ?? '--';
+        document.getElementById('statUsers').textContent = s.user?.totalUsers ?? '--';
+        document.getElementById('statActive').textContent = `${s.user?.activeUsersToday ?? '--'}/${s.user?.activeUsersWeek ?? '--'}/${s.user?.activeUsersMonth ?? '--'}`;
+        document.getElementById('statSess').textContent = s.session?.totalSessions ?? '--';
+        document.getElementById('statTemp').textContent = s.session?.tempSessions ?? '--';
+        document.getElementById('statCache').textContent = s.cache?.totalCacheRecords ?? '--';
+        document.getElementById('hostName').textContent = m.host?.hostname ?? '--';
+        document.getElementById('hostPlatform').textContent = m.host?.platform ?? '--';
+        document.getElementById('hostArch').textContent = m.host?.arch ?? '--';
+        document.getElementById('load1').textContent = m.host?.load1 ?? '--';
+        document.getElementById('load5').textContent = m.host?.load5 ?? '--';
+        document.getElementById('load15').textContent = m.host?.load15 ?? '--';
+        document.getElementById('memTotalHost').textContent = m.host?.totalMemMB ?? '--';
+        document.getElementById('memFree').textContent = m.host?.freeMemMB ?? '--';
+        document.getElementById('procPid').textContent = m.processInfo?.pid ?? '--';
+        document.getElementById('nodeVer').textContent = m.processInfo?.nodeVersion ?? '--';
+        document.getElementById('bunVer').textContent = m.processInfo?.bunVersion ?? '--';
+        document.getElementById('env').textContent = m.processInfo?.env ?? '--';
+        document.getElementById('raw').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('updated').textContent = new Date().toLocaleString();
+      } catch (e) {
+        document.getElementById('updated').textContent = '加载失败';
+        document.getElementById('raw').textContent = String(e);
+      }
+    }
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

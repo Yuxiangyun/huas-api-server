@@ -102,6 +102,7 @@ echo "  重启服务: systemctl restart ${APP_NAME}"
 echo "  查看状态: systemctl status ${APP_NAME}"
 echo "  停止服务: systemctl stop ${APP_NAME}"
 echo "  健康检查: curl http://localhost:12103/health"
-echo "  性能指标: curl http://localhost:12103/metrics"
+echo "  监控状态: curl http://localhost:13001/status.json"
+echo "  监控面板: http://<主机>:13001/dashboard （如仅本机开放可改 MONITOR_HOST=127.0.0.1）"
 
 log_info "部署完成！"
