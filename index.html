@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>文理小助手</title>
+    <!-- 样式：保留原始 Tailwind 配置，未改动配色和布局 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -32,14 +33,14 @@
         .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         * { -webkit-tap-highlight-color: transparent; }
         
-        /* 🔥 核心优化：移动端固定列 (Sticky Column) */
+        /* 移动端课表左侧固定列 */
         .sticky-col {
             position: sticky;
             left: 0;
-            z-index: 30; /* 保证在课程卡片之上 */
-            background-color: #F8FAFC; /* 必须有背景色，防止透视 */
+            z-index: 30;
+            background-color: #F8FAFC;
         }
-        /* 固定列右侧加个阴影，更有层次感 */
+        /* 固定列右侧阴影 */
         .sticky-shadow::after {
             content: '';
             position: absolute;
@@ -54,12 +55,12 @@
 </head>
 <body class="bg-[#F0F4F8] text-ink min-h-[100dvh] flex flex-col items-center py-6 px-4 pb-10">
 
-    <!-- 头部 -->
+    <!-- 头部区域 -->
     <header class="mb-6 text-center w-full">
         <h1 class="text-3xl font-black tracking-tighter text-popTeal ">文理 <span class="text-ink">小助手</span></h1>
     </header>
 
-    <!-- Loading -->
+    <!-- Loading 遮罩 -->
     <div id="loading" class="hidden fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
         <div class="animate-spin rounded-full h-10 w-10 border-4 border-popTeal border-t-popOrange mb-3"></div>
         <div class="font-black bg-popYellow px-3 py-1 border border-ink shadow-hard text-xs">加载中...</div>
@@ -108,11 +109,11 @@
         </div>
     </section>
 
-    <!-- 数据展示区域：顶置信息 + 课表 + 折叠成绩单 -->
+    <!-- 数据展示区域：顶置信息 + 课表 + 成绩 -->
     <section id="dataArea" class="hidden w-full max-w-4xl space-y-4">
         <!-- 顶部信息栏：个人 + 一卡通 -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- 个人信息 -->
+            <!-- 个人信息卡片 -->
             <div class="md:col-span-2 bg-white border-2 border-ink rounded-xl shadow-hard p-4 flex items-center gap-4 relative overflow-hidden">
                 <div class="w-14 h-14 bg-indigo-50 rounded-full border-2 border-ink flex items-center justify-center shrink-0 overflow-hidden">
                     <img id="userAvatar" src="" alt="Avatar" class="w-full h-full object-cover mix-blend-multiply">
@@ -127,7 +128,7 @@
                 <button onclick="handleLogout()" class="absolute top-0 right-0 p-3 text-[10px] font-bold text-slate-300 hover:text-red-500">退出</button>
             </div>
 
-            <!-- 一卡通 -->
+            <!-- 一卡通卡片 -->
             <div class="text-white border-2 border-transparent rounded-xl shadow-hard p-4 flex flex-col justify-between relative overflow-hidden" style="background: radial-gradient(circle at 20% 20%, #1f7a8c 0%, #0f3d3e 55%, #0b2b2c 100%);">
                 <div class="absolute -right-6 -top-6 w-28 h-28 bg-white/10 rounded-full blur-2xl"></div>
                 <div class="flex justify-between items-start z-10">
@@ -289,7 +290,6 @@
                     localStorage.setItem('huas_token', globalToken);
                     reauthFailedNotified = false;
                     if (!quiet) {
-                        // 只有用户主动登录时才更新“记住账号密码”，避免静默重登时误清空
                         await saveCredentialsIfNeeded(username, password);
                         document.getElementById('loginCard').classList.add('hidden');
                         document.getElementById('dataArea').classList.remove('hidden');
@@ -309,7 +309,6 @@
                     log('login invalid sessionId, refreshing captcha session');
                     await initCaptcha(false);
                     if (quiet) {
-                        // 静默模式下再尝试一次
                         return performLogin(username, password, '', true);
                     }
                     alert('会话已失效，已刷新验证码，请重试');
@@ -389,29 +388,20 @@
             }
         }
 
-        // 🔥 修复：一卡通状态未知显示问题
         function renderEcard(data) {
             if(!data) return;
-            
-            // 修复未知状态：如果状态为空或包含"未知"，强制显示"正常"
             let statusText = data.status;
             if (!statusText || statusText.includes('未知')) {
                 statusText = '正常';
             }
-            
-            // 修复金额：如果金额不存在，显示 0.00
             const balanceText = (data.balance === undefined || data.balance === null) ? '0.00' : data.balance;
-
             const elStatus = document.getElementById('ecStatus');
             elStatus.innerText = statusText;
-            
-            // 状态颜色逻辑
             if (statusText === '正常') {
                 elStatus.className = "px-2 py-0.5 border border-popCyan/40 bg-popCyan/10 rounded-full text-[10px] font-bold text-popCyan";
             } else {
                 elStatus.className = "px-2 py-0.5 border border-red-400/40 bg-red-400/10 rounded-full text-[10px] font-bold text-red-400";
             }
-
             document.getElementById('ecBalance').innerText = balanceText;
         }
 
@@ -435,11 +425,9 @@
             }
         }
 
-        // 🔥 移动端 Sticky 课表
         function renderSchedule(data) {
             if(!data) return;
             document.getElementById('schWeek').innerText = data.week || 'Schedule';
-            
             const container = document.getElementById('scheduleContainer');
             const isMobile = window.innerWidth < 768;
             const leftColWidth = isMobile ? 50 : 60;
@@ -458,14 +446,8 @@
                     courseMap[key].push(c);
                 });
             }
-
-            // Grid 定义：第一列固定，后面 7 列最小 110px，避免周末列被压缩
             let html = `<div class="grid" style="grid-template-columns:${leftColWidth}px repeat(7, minmax(${dayMinWidth}px,1fr));">`;
-            
-            // 左上角空块 (Sticky)
             html += `<div class="sticky-col sticky-shadow bg-[#F8FAFC] border-b border-r border-slate-100 z-40" style="width:${leftColWidth}px"></div>`;
-            
-            // 星期表头
             const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
             const todayColIdx = (new Date().getDay() + 6) % 7;
             days.forEach((d, i) => {
@@ -474,25 +456,17 @@
                 const marker = isToday ? 'today-col' : '';
                 html += `<div class="text-center font-black text-[10px] py-3 border-b border-slate-100 ${bgClass} ${marker}" data-day="${i}">${d}</div>`;
             });
-
             const sections = ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12'];
-            
             for (let s = 0; s < 6; s++) {
-                // 左侧时间轴 (Sticky + Shadow)
                 html += `
                     <div class="sticky-col sticky-shadow flex items-center justify-center font-bold text-slate-400 bg-[#F8FAFC] border-r border-b border-slate-100 text-[10px] z-30" style="width:${leftColWidth}px">
                         ${sections[s]}
                     </div>
                 `;
-                
-                // 课程格子
                 for (let d = 0; d < 7; d++) {
                     const courses = courseMap[`${d}_${s}`];
-                    // 今天的列加一点微背景区分
                     const colBg = d === todayColIdx ? 'bg-popTeal/5' : '';
-                    
                     html += `<div class="p-1 border-b border-slate-100 border-r border-dashed border-slate-200 ${colBg} min-h-[90px] relative" data-day="${d}">`;
-                    
                     if (courses && courses.length > 0) {
                         html += `<div class="flex flex-col gap-1 h-full">`; 
                         courses.forEach((course, idx) => {
@@ -519,7 +493,6 @@
                     html += `</div>`;
                 }
             }
-
             html += `</div>`;
             container.innerHTML = html;
         }
@@ -567,24 +540,22 @@
                 sourceEl.innerText = '';
                 sourceEl.classList.add('hidden');
             }
-
             const list = document.getElementById('gradeList');
             list.innerHTML = '';
             const items = data.items || [];
-
             if (!items.length) {
-                list.innerHTML = `<div class="text-center text-slate-400 text-sm py-6">暂无成绩数据</div>`;
+                // 教务返回空列表时，提示可能未完成评教或当前无成绩
+                list.innerHTML = `<div class="text-center text-slate-400 text-sm py-6">
+                    教务系统未返回成绩，可能未完成评教或当前无成绩数据，请完成评教后重试。
+                </div>`;
                 return;
             }
-
-            // 按学期分组并按时间倒序
             const groupMap = {};
             items.forEach(item => {
                 const term = item.term || '未知学期';
                 if (!groupMap[term]) groupMap[term] = [];
                 groupMap[term].push(item);
             });
-
             const parseTerm = (term) => {
                 const m = term.match(/(\d{4}).*?(\d{4}).*?(\d+)/);
                 if (m) return { y1: parseInt(m[1]), y2: parseInt(m[2]), sem: parseInt(m[3]) };
@@ -599,14 +570,12 @@
                 }
                 return b.localeCompare(a);
             });
-
             sortedTerms.forEach(term => {
                 list.innerHTML += `
                     <div class="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] font-black text-slate-600 tracking-wide">
                         ${term}
                     </div>
                 `;
-
                 groupMap[term].forEach(item => {
                     const passTag = item.pass === null ? '' : item.pass ? 'text-popTeal' : 'text-red-500';
                     const scoreText = item.score !== null ? item.score : item.scoreText || '--';
@@ -614,7 +583,6 @@
                     const natureRow = natureText ? `<div class="flex items-center justify-between text-[11px] text-slate-500 mt-2">
                                 <span>性质：${natureText}</span>
                             </div>` : '';
-
                     list.innerHTML += `
                         <div class="p-3 border border-slate-200 rounded-xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                             <div class="flex items-start justify-between gap-3">
@@ -643,7 +611,6 @@
             requireCaptcha = false;
             document.getElementById('captcha').value = '';
             document.getElementById('captchaBlock').classList.add('hidden');
-            // 保留已保存的账号密码，回到登录卡片并填充
             document.getElementById('dataArea').classList.add('hidden');
             document.getElementById('loginCard').classList.remove('hidden');
             if (!preserveCreds) {
@@ -683,7 +650,6 @@
             if (!saved || !saved.username || !saved.password || saved.remember !== true) return;
             autoLoginAttempted = true;
             setLoading(true);
-            // 利用静默重登逻辑尝试一次自动登录，失败则保持在登录页
             const ok = await tryAutoRelogin();
             if (ok) {
                 document.getElementById('loginCard').classList.add('hidden');
@@ -716,6 +682,14 @@
             if (next && name === 'grades' && !panelLoaded.grades) {
                 loadGrades();
             }
+        }
+
+        function refreshGradesButton() {
+            const container = document.getElementById('panelContent-grades');
+            if (container.classList.contains('hidden')) {
+                togglePanel('grades', true);
+            }
+            loadGrades(true);
         }
 
         function readCredentialsLocal() {
@@ -795,16 +769,6 @@
             });
         }
 
-        function refreshGradesButton() {
-            // 展开折叠并刷新
-            const container = document.getElementById('panelContent-grades');
-            if (container.classList.contains('hidden')) {
-                togglePanel('grades', true);
-            }
-            loadGrades(true);
-        }
-
-        // 统一处理 401：尝试用本地缓存自动重登，失败则提示并登出
         async function handleFetchError(error, retryFn, fallbackMsg = '请求失败') {
             if (error.message === 'SESSION_EXPIRED') {
                 log('session expired, start reauth');
@@ -821,7 +785,6 @@
                     alert('登录已过期，请重新登录');
                     reauthFailedNotified = true;
                 }
-                // 只退回登录卡片，保留已记住的账号密码，方便再次输入验证码
                 handleLogout(true);
             } else {
                 alert(fallbackMsg);
@@ -845,7 +808,6 @@
             isRelogging = true;
             currentSessionId = '';
             requireCaptcha = false;
-            // 重置验证码会话但不展示输入框
             await initCaptcha(false);
             const ok = await performLogin(saved.username, saved.password, '', true);
             isRelogging = false;
