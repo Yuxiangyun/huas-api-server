@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>文理小助手</title>
-    <!-- 样式：保留原始 Tailwind 配置，未改动配色和布局 -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -22,6 +22,21 @@
                     boxShadow: {
                         'hard': '4px 4px 0px 0px #134E4A', 
                         'card': '2px 2px 0px 0px #134E4A',
+                        'float': '6px 6px 0px 0px #134E4A',
+                    },
+                    animation: {
+                        'float': 'float 3s ease-in-out infinite',
+                        'bounce-in': 'bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-5px)' },
+                        },
+                        bounceIn: {
+                            '0%': { transform: 'scale(0.8)', opacity: '0' },
+                            '100%': { transform: 'scale(1)', opacity: '1' }
+                        }
                     }
                 }
             }
@@ -34,174 +49,288 @@
         * { -webkit-tap-highlight-color: transparent; }
         
         /* 移动端课表左侧固定列 */
-        .sticky-col {
-            position: sticky;
-            left: 0;
-            z-index: 30;
-            background-color: #F8FAFC;
-        }
-        /* 固定列右侧阴影 */
+        .sticky-col { position: sticky; left: 0; z-index: 30; background-color: #F8FAFC; }
         .sticky-shadow::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: -4px;
-            width: 4px;
-            height: 100%;
-            background: linear-gradient(to right, rgba(0,0,0,0.05), transparent);
-            pointer-events: none;
+            content: ''; position: absolute; top: 0; right: -4px; width: 4px; height: 100%;
+            background: linear-gradient(to right, rgba(0,0,0,0.05), transparent); pointer-events: none;
         }
+        /* 3D 图标微交互 */
+        .icon-3d { filter: drop-shadow(2px 4px 6px rgba(19, 78, 74, 0.2)); transition: transform 0.3s; }
+        .icon-3d:hover { transform: scale(1.1) rotate(5deg); }
     </style>
 </head>
-<body class="bg-[#F0F4F8] text-ink min-h-[100dvh] flex flex-col items-center py-6 px-4 pb-10">
+<!-- 核心布局：限制最大宽度 max-w-xl 并居中，防止大屏拉伸 -->
+<body class="bg-[#F0F4F8] text-ink min-h-[100dvh] flex flex-col py-8 px-4 pb-20 relative max-w-xl mx-auto shadow-[0_0_50px_rgba(0,0,0,0.05)] border-x border-white/50">
 
-    <!-- 头部区域 -->
-    <header class="mb-6 text-center w-full">
-        <h1 class="text-3xl font-black tracking-tighter text-popTeal ">文理 <span class="text-ink">小助手</span></h1>
+    <!-- 背景装饰 Blob -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div class="absolute -top-10 -right-10 w-64 h-64 bg-popCyan/10 rounded-full blur-3xl"></div>
+        <div class="absolute top-40 -left-10 w-40 h-40 bg-popPink/10 rounded-full blur-2xl"></div>
+    </div>
+
+    <!-- 1. 头部区域：横向布局，稳重且美观 -->
+    <header class="mb-8 w-full flex flex-col items-center justify-center animate-float">
+        <div class="flex items-center gap-3">
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/School/3D/school_3d.png" 
+                 class="w-12 h-12 object-contain drop-shadow-sm icon-3d" alt="School">
+            <h1 class="text-3xl font-black tracking-tighter text-ink flex items-center gap-1">
+                文理<span class="text-popTeal underline decoration-4 decoration-popYellow underline-offset-4">小助手</span>
+            </h1>
+        </div>
+        <p class="text-[10px] font-bold text-slate-400 mt-2 tracking-[0.2em] uppercase">Hunan University of Arts and Science</p>
     </header>
 
     <!-- Loading 遮罩 -->
     <div id="loading" class="hidden fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-        <div class="animate-spin rounded-full h-10 w-10 border-4 border-popTeal border-t-popOrange mb-3"></div>
-        <div class="font-black bg-popYellow px-3 py-1 border border-ink shadow-hard text-xs">加载中...</div>
+        <div class="relative">
+            <div class="animate-spin rounded-full h-12 w-12 border-[5px] border-slate-200 border-t-popTeal mb-4"></div>
+        </div>
+        <div class="font-black bg-popYellow px-4 py-1 border-2 border-ink shadow-hard text-xs rounded-full">数据加载中...</div>
     </div>
 
-    <!-- 登录卡片 -->
-    <section id="loginCard" class="w-full max-w-sm bg-white border-2 border-ink rounded-xl shadow-hard p-5 mb-8">
-        <div class="flex items-center justify-between mb-5">
-            <h2 class="text-xl font-black">登录</h2>
-            <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold text-slate-400">SYSTEM READY</span>
-                <div class="w-2.5 h-2.5 rounded-full bg-green-400 border border-ink animate-pulse"></div>
+    <!-- 2. 登录卡片 -->
+    <section id="loginCard" class="w-full bg-white border-2 border-ink rounded-xl shadow-float p-6 mb-8 relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 w-20 h-20 bg-popYellow/30 rounded-full blur-xl"></div>
+        
+        <div class="flex items-center justify-between mb-6 relative z-10">
+            <h2 class="text-2xl font-black italic text-ink">登录</h2>
+            <div class="flex items-center gap-2 bg-slate-100 px-2 py-1 rounded border border-ink/20">
+                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span class="text-[10px] font-bold text-slate-400">ONLINE</span>
             </div>
         </div>
 
-        <div class="space-y-4">
-            <div>
-                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">学号</label>
-                <input type="text" id="username" 
-                    class="w-full text-base bg-slate-50 border-2 border-ink rounded-lg p-3 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal" placeholder="请输入学号">
+        <div class="space-y-5 relative z-10">
+            <div class="relative group">
+                <label class="block text-xs font-bold mb-1.5 ml-1 text-slate-500 flex items-center gap-1">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Identification%20card/3D/identification_card_3d.png" class="w-4 h-4">
+                    学号
+                </label>
+                <input type="text" id="username" class="w-full text-base bg-slate-50 border-2 border-ink rounded-xl p-3 pl-4 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal placeholder:text-slate-300 focus:bg-white" placeholder="请输入学号">
             </div>
-            <div>
-                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">密码</label>
-                <input type="password" id="password" 
-                    class="w-full text-base bg-slate-50 border-2 border-ink rounded-lg p-3 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal" placeholder="请输入智慧文理密码">
+            <div class="relative group">
+                <label class="block text-xs font-bold mb-1.5 ml-1 text-slate-500 flex items-center gap-1">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Key/3D/key_3d.png" class="w-4 h-4">
+                    密码
+                </label>
+                <input type="password" id="password" class="w-full text-base bg-slate-50 border-2 border-ink rounded-xl p-3 pl-4 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal placeholder:text-slate-300 focus:bg-white" placeholder="智慧文理密码">
             </div>
             <div id="captchaBlock" class="hidden">
-                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">验证码（需要时）</label>
+                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">验证码</label>
                 <div class="flex gap-2 h-[50px]">
-                    <input type="text" id="captcha" placeholder="ABCD" 
-                        class="flex-1 min-w-0 text-base bg-slate-50 border-2 border-ink rounded-lg p-3 font-bold uppercase focus:outline-none focus:border-popTeal focus:shadow-hard transition-all">
-                    
-                    <div class="w-28 border-2 border-ink rounded-lg bg-slate-200 cursor-pointer overflow-hidden relative group shrink-0 active:scale-95 transition-transform" onclick="initCaptcha(true)">
+                    <input type="text" id="captcha" placeholder="ABCD" class="flex-1 min-w-0 text-base bg-slate-50 border-2 border-ink rounded-xl p-3 font-bold uppercase focus:outline-none focus:border-popTeal focus:shadow-hard transition-all">
+                    <div class="w-28 border-2 border-ink rounded-xl bg-slate-100 cursor-pointer overflow-hidden relative group shrink-0 active:scale-95 transition-transform shadow-card" onclick="initCaptcha(true)">
                         <img id="captchaImg" class="w-full h-full object-fill hidden">
-                        <div id="captchaText" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400">点击刷新</div>
+                        <div id="captchaText" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:text-popTeal">点击刷新</div>
                     </div>
                 </div>
             </div>
-            <label class="flex items-center gap-2 text-xs font-bold text-slate-500 select-none">
-                <input id="rememberMe" type="checkbox" class="w-4 h-4 border-2 border-ink rounded">
-                记住学号和密码
-            </label>
-            <button onclick="handleLogin()" class="w-full bg-popTeal border-2 border-ink text-white font-black py-3 rounded-lg shadow-hard hover:translate-y-[-2px] hover:bg-popOrange transition-all active:translate-y-0 active:shadow-none mt-2">
-                登 录
+            <div class="flex items-center justify-between">
+                <label class="flex items-center gap-2 text-xs font-bold text-slate-500 select-none cursor-pointer">
+                    <input id="rememberMe" type="checkbox" class="w-4 h-4 border-2 border-ink rounded checked:bg-popTeal checked:border-ink focus:ring-0 transition-colors">
+                    记住我
+                </label>
+            </div>
+            <button onclick="handleLogin()" class="w-full bg-popTeal border-2 border-ink text-white text-lg font-black py-3 rounded-xl shadow-hard hover:translate-y-[-2px] hover:bg-popTeal/90 transition-all active:translate-y-0 active:shadow-none mt-2 flex items-center justify-center gap-2 group">
+                <span>进入系统</span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-5 h-5 group-hover:translate-x-1 transition-transform">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                </svg>
             </button>
         </div>
     </section>
 
-    <!-- 数据展示区域：顶置信息 + 课表 + 成绩 -->
-    <section id="dataArea" class="hidden w-full max-w-4xl space-y-4">
-        <!-- 顶部信息栏：个人 + 一卡通 -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- 个人信息卡片 -->
-            <div class="md:col-span-2 bg-white border-2 border-ink rounded-xl shadow-hard p-4 flex items-center gap-4 relative overflow-hidden">
-                <div class="w-14 h-14 bg-indigo-50 rounded-full border-2 border-ink flex items-center justify-center shrink-0 overflow-hidden">
-                    <img id="userAvatar" src="" alt="Avatar" class="w-full h-full object-cover mix-blend-multiply">
+    <!-- 数据展示区域 -->
+    <section id="dataArea" class="hidden w-full space-y-6">
+        
+        <!-- 3. 个人信息卡片 (ID Card 风格，整洁紧凑) -->
+        <div class="bg-white border-2 border-ink rounded-xl shadow-card relative overflow-hidden group">
+             <!-- 背景装饰水印 -->
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Identification%20card/3D/identification_card_3d.png" 
+            class="absolute -right-4 -bottom-4 w-24 h-24 opacity-10 rotate-[-15deg] pointer-events-none grayscale">
+            
+            <div class="p-4 flex items-center gap-4 relative z-10">
+                <!-- 头像：圆角矩形 -->
+                <div class="w-16 h-16 bg-indigo-50 rounded-xl border-2 border-ink flex items-center justify-center shrink-0 overflow-hidden shadow-[2px_2px_0_0_#134E4A]">
+                    <img id="userAvatar" src="" alt="Avatar" class="w-full h-full object-cover">
                 </div>
-                <div class="min-w-0 flex-1">
-                    <div class="text-xl font-black text-ink truncate" id="uiName">--</div>
-                    <div class="flex flex-wrap items-center gap-2 mt-2">
-                        <span class="px-2 py-1 bg-slate-100 border border-ink rounded-lg text-xs font-black font-mono text-ink shadow-card" id="uiId">--</span>
-                        <span class="px-2 py-1 bg-popYellow/60 border border-ink rounded-lg text-xs font-black text-ink shadow-card" id="uiClass">--</span>
-                    </div>
-                </div>
-                <button onclick="handleLogout()" class="absolute top-0 right-0 p-3 text-[10px] font-bold text-slate-300 hover:text-red-500">退出</button>
-            </div>
 
-            <!-- 一卡通卡片 -->
-            <div class="text-white border-2 border-transparent rounded-xl shadow-hard p-4 flex flex-col justify-between relative overflow-hidden" style="background: radial-gradient(circle at 20% 20%, #1f7a8c 0%, #0f3d3e 55%, #0b2b2c 100%);">
-                <div class="absolute -right-6 -top-6 w-28 h-28 bg-white/10 rounded-full blur-2xl"></div>
-                <div class="flex justify-between items-start z-10">
-                    <span class="text-[10px] font-bold tracking-widest opacity-80 text-[#9ee0ff]">校园卡余额</span>
-                    <span class="px-2 py-0.5 border border-[#9ee0ff]/50 bg-[#9ee0ff]/15 rounded-full text-[10px] font-bold text-[#9ee0ff]" id="ecStatus">--</span>
-                </div>
-                <div class="z-10 mt-1 flex justify-between items-end">
-                    <div class="text-3xl font-black tracking-tighter flex items-baseline gap-1">
-                        <span class="text-sm text-[#ffd166]">¥</span>
-                        <span id="ecBalance">--</span>
+                <!-- 中间信息 -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h2 class="text-xl font-black text-ink tracking-tight truncate" id="uiName">--</h2>
+                        <!-- 身份标签 -->
+                        <span class="px-1.5 py-[2px] rounded bg-popPink border border-ink text-white text-[9px] font-black shadow-[1px_1px_0_0_#134E4A]">STUDENT</span>
                     </div>
-                    <button onclick="loadEcard(true)" class="text-[10px] font-bold px-3 py-1.5 rounded-md border border-white/30 bg-white/10 hover:bg-white/20 active:scale-95 transition-all">
-                        刷新一卡通
-                    </button>
+                    <div class="space-y-0.5">
+                        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                            <span class="w-3.5 h-3.5 flex items-center justify-center bg-slate-100 rounded border border-slate-200 text-[8px] text-slate-400">ID</span>
+                            <span id="uiId" class="font-mono tracking-wide">--</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                            <span class="w-3.5 h-3.5 flex items-center justify-center bg-slate-100 rounded border border-slate-200 text-[8px] text-slate-400">CL</span>
+                            <span id="uiClass" class="truncate">--</span>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- 退出按钮 (Flex 布局，靠右对齐) -->
+                <button onclick="handleLogout()" class="shrink-0 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="退出登录">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
+                    </svg>
+                </button>
             </div>
         </div>
 
-        <!-- 课表（默认展开） -->
-        <div class="bg-white border-2 border-ink rounded-xl shadow-hard overflow-hidden">
-            <div class="flex items-center justify-between p-4 border-b-2 border-slate-100">
-                <div class="flex items-center gap-2">
-                    <div class="w-2 h-5 bg-popTeal border-2 border-ink -rotate-6 rounded-sm"></div>
-                    <h3 class="text-lg font-black tracking-tight">课表</h3>
-                    <span class="text-[10px] font-bold text-slate-400" id="schWeek">--</span>
+        <!-- 4. 一卡通卡片 (SVG 芯片，深色质感) -->
+        <div class="w-full text-white border-2 border-ink rounded-xl shadow-card p-5 flex flex-col justify-between relative overflow-hidden h-[140px] group transition-all hover:shadow-hard">
+            <!-- 3D 信用卡图标装饰 -->
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Credit%20card/3D/credit_card_3d.png" 
+                    class="absolute -right-5 -bottom-6 w-24 h-24 opacity-90 rotate-[-15deg] group-hover:rotate-0 group-hover:scale-110 transition-all duration-300 z-0 drop-shadow-lg">
+            
+            <!-- 深色背景与纹理 -->
+            <div class="absolute inset-0 bg-[#134E4A] z-[-1]"></div>
+            <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 10px 10px;"></div>
+
+            <!-- 顶部：芯片与标题 -->
+            <div class="flex justify-between items-start z-10 relative">
+                <div class="flex items-center gap-3">
+                    <!-- SVG 矢量芯片 (清晰锐利) -->
+                    <svg width="36" height="26" viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-sm">
+                        <rect width="40" height="28" rx="4" fill="#FCD34D"/> <!-- 金色底 -->
+                        <rect x="2" y="2" width="36" height="24" rx="2" stroke="#B45309" stroke-opacity="0.2" stroke-width="1"/>
+                        <path d="M12 2V26" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
+                        <path d="M28 2V26" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
+                        <path d="M2 14H12" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
+                        <path d="M28 14H38" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
+                        <rect x="15" y="8" width="10" height="12" rx="2" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
+                    </svg>
+                    <span class="text-[10px] font-black tracking-widest opacity-80 uppercase text-yellow-50/70 mt-1">Campus Card</span>
                 </div>
-                <button onclick="loadSchedule(true)" class="text-[10px] font-bold bg-slate-50 px-3 py-1.5 border border-slate-300 rounded hover:bg-white active:scale-95 transition-all">
-                    刷新课表
+                <!-- 状态标签 -->
+                <span class="px-2 py-0.5 border border-white/20 bg-white/10 rounded-full text-[10px] font-bold backdrop-blur-sm" id="ecStatus">--</span>
+            </div>
+
+            <!-- 底部：余额与刷新 -->
+            <div class="z-10 mt-1 flex justify-between items-end relative">
+                <div class="flex flex-col">
+                    <span class="text-[9px] text-white/50 font-bold uppercase mb-0.5 ml-0.5">Balance</span>
+                    <div class="text-4xl font-black tracking-tighter flex items-baseline gap-1">
+                        <span class="text-lg text-popYellow font-bold">¥</span>
+                        <span id="ecBalance" class="text-white drop-shadow-md">--</span>
+                    </div>
+                </div>
+                <button onclick="loadEcard(true)" class="p-2 rounded-full bg-white/10 border border-white/10 hover:bg-white/20 hover:rotate-180 transition-all active:scale-90 mb-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
                 </button>
             </div>
-            <div class="overflow-x-auto hide-scroll pb-2">
+        </div>
+
+        <!-- 课表 -->
+        <div class="bg-white border-2 border-ink rounded-xl shadow-hard overflow-hidden">
+            <div class="flex items-center justify-between p-4 border-b-2 border-slate-100 bg-slate-50/50">
+                <div class="flex items-center gap-3">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Spiral%20calendar/3D/spiral_calendar_3d.png" class="w-8 h-8 icon-3d">
+                    <div>
+                        <h3 class="text-lg font-black tracking-tight leading-none text-ink">本周课表</h3>
+                        <span class="text-[10px] font-bold text-slate-400" id="schWeek">Loading...</span>
+                    </div>
+                </div>
+                <button onclick="loadSchedule(true)" class="text-[10px] font-bold bg-white px-3 py-1.5 border-2 border-slate-200 rounded-lg text-slate-600 hover:border-popTeal hover:text-popTeal active:scale-95 transition-all shadow-sm">
+                    刷新
+                </button>
+            </div>
+            <div class="overflow-x-auto hide-scroll pb-2 bg-white">
                 <div class="min-w-[160vw] md:min-w-full" id="scheduleContainer"></div>
             </div>
         </div>
 
-        <!-- 成绩（默认收起） -->
-        <div class="bg-white border-2 border-ink rounded-xl shadow-hard overflow-hidden" data-panel="grades" data-open="false">
-            <div class="flex items-center justify-between p-4 border-b-2 border-slate-100">
-                <button class="flex items-center gap-2" onclick="togglePanel('grades')">
-                    <div class="w-2 h-5 bg-popOrange border-2 border-ink -rotate-6 rounded-sm"></div>
-                    <h3 class="text-lg font-black tracking-tight">成绩单</h3>
-                    <span id="gradeSource" class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 border border-slate-200 rounded text-slate-500 hidden"></span>
-                </button>
-                <button onclick="refreshGradesButton()" class="text-[10px] font-bold bg-slate-50 px-3 py-1.5 border border-slate-300 rounded hover:bg-white active:scale-95 transition-all">
-                    刷新成绩
-                </button>
+        <!-- 5. 成绩 (美化统计框 + 空状态) -->
+        <div class="bg-white border-2 border-ink rounded-xl shadow-hard overflow-hidden transition-all duration-300" data-panel="grades" data-open="false">
+            <div class="flex items-center justify-between p-4 border-b-2 border-slate-100 bg-slate-50/50 cursor-pointer hover:bg-slate-50" onclick="togglePanel('grades')">
+                <div class="flex items-center gap-3">
+                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Trophy/3D/trophy_3d.png" class="w-8 h-8 icon-3d">
+                    <div class="flex flex-col items-start">
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-lg font-black tracking-tight leading-none text-ink">成绩单</h3>
+                            <span id="gradeSource" class="px-1.5 py-0.5 text-[9px] font-black bg-slate-200 rounded text-slate-500 hidden transform scale-90 origin-left"></span>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-400">点击展开/收起</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="event.stopPropagation(); refreshGradesButton()" class="text-[10px] font-bold bg-white px-3 py-1.5 border-2 border-slate-200 rounded-lg text-slate-600 hover:border-popOrange hover:text-popOrange active:scale-95 transition-all shadow-sm">
+                        刷新
+                    </button>
+                    <div class="w-6 h-6 flex items-center justify-center transition-transform duration-300" id="gradeArrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-4 h-4 text-slate-400">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
+                    </div>
+                </div>
             </div>
+            
             <div id="panelContent-grades" class="hidden">
-                <div class="p-4 space-y-3">
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm font-bold">
-                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50/60">
-                            <div class="text-[10px] text-slate-500 mb-1">所修门数</div>
-                            <div id="gTotal" class="text-lg">--</div>
+                <div class="p-4 space-y-5 bg-[#F8FAFC]">
+                    <!-- 统计数据卡片：加重样式 (边框+阴影) -->
+                    <div class="grid grid-cols-2 gap-4 text-sm font-bold">
+                        <!-- 学分卡片 -->
+                        <div class="p-3 bg-white border-2 border-ink rounded-xl shadow-card flex flex-col items-center justify-center text-center relative overflow-hidden">
+                            <div class="absolute top-0 right-0 w-8 h-8 bg-popTeal/10 rounded-bl-xl"></div>
+                            <div class="text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-black">Credits</div>
+                            <div id="gCredits" class="text-2xl font-black text-popTeal tracking-tight">--</div>
                         </div>
-                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50/60">
-                            <div class="text-[10px] text-slate-500 mb-1">所修总学分</div>
-                            <div id="gCredits" class="text-lg">--</div>
-                        </div>
-                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50/60">
-                            <div class="text-[10px] text-slate-500 mb-1">平均绩点</div>
-                            <div id="gGpa" class="text-lg">--</div>
-                        </div>
-                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50/60">
-                            <div class="text-[10px] text-slate-500 mb-1">平均成绩</div>
-                            <div id="gAvg" class="text-lg">--</div>
+                        <!-- GPA卡片 -->
+                        <div class="p-3 bg-white border-2 border-ink rounded-xl shadow-card flex flex-col items-center justify-center text-center relative overflow-hidden">
+                             <div class="absolute top-0 right-0 w-8 h-8 bg-popOrange/10 rounded-bl-xl"></div>
+                            <div class="text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-black">GPA</div>
+                            <div id="gGpa" class="text-2xl font-black text-popOrange tracking-tight">--</div>
                         </div>
                     </div>
-
-                    <div id="gradeList" class="space-y-3"></div>
+                    
+                    <!-- 成绩列表容器 -->
+                    <div id="gradeList" class="space-y-3 min-h-[100px]"></div>
                 </div>
             </div>
         </div>
     </section>
+
+    <!-- 底部区域 -->
+    <footer class="mt-8 mb-4 w-full flex justify-center">
+        <button onclick="toggleAboutModal(true)" class="group flex items-center gap-2 px-5 py-2 rounded-full bg-white border border-ink/10 shadow-sm hover:shadow-card hover:border-ink hover:-translate-y-1 transition-all duration-300">
+            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Information/3D/information_3d.png" class="w-5 h-5 group-hover:rotate-12 transition-transform">
+            <span class="text-xs font-bold text-slate-500 group-hover:text-ink">关于服务</span>
+        </button>
+    </footer>
+
+    <!-- 关于服务 Modal -->
+    <div id="aboutModal" class="hidden fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm transition-opacity" onclick="toggleAboutModal(false)"></div>
+        <div class="bg-white border-2 border-ink rounded-2xl shadow-float w-full max-w-sm p-6 relative z-10 animate-float-up transform transition-all">
+            <button onclick="toggleAboutModal(false)" class="absolute top-4 right-4 p-1 hover:bg-slate-100 rounded-full transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 text-slate-400">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <div class="text-center mb-6">
+                <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Rocket/3D/rocket_3d.png" 
+     width="80" height="80" 
+     style="margin: 0 auto 12px auto; filter: drop-shadow(4px 4px 8px rgba(0,0,0,0.15)); display: block;"
+     alt="Rocket">
+                <h3 class="text-xl font-black text-ink">关于文理小助手</h3>
+                <p class="text-xs font-bold text-slate-400 mt-1">Version 1.0.3 (Stable)</p>
+            </div>
+            <div class="space-y-3 text-sm font-medium text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
+                <p>🎓 <strong class="text-ink">纯净体验：</strong><br>无广告、无推广，仅提供最核心的查询服务。</p>
+                <p>🔒 <strong class="text-ink">安全直连：</strong><br>数据仅在本地与教务系统交互，不存储密码。</p>
+                <p>🔨 <strong class="text-ink">反映问题联系我：</strong><br>微信：-nullsleep</p>
+            </div>
+            <button onclick="toggleAboutModal(false)" class="w-full bg-popYellow border-2 border-ink text-ink font-black py-3 rounded-xl shadow-card active:shadow-none active:translate-y-[2px] transition-all">我知道了</button>
+        </div>
+    </div>
 
     <script>
         const API_BASE = ''; 
@@ -224,10 +353,19 @@
             'bg-popPink', 'bg-[#A5F3FC]', 'bg-[#FDA4AF]'
         ];
 
+        function toggleAboutModal(show) {
+            const modal = document.getElementById('aboutModal');
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.querySelector('div.bg-white').classList.add('animate-bounce-in');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
         if (globalToken) {
             loadAllData();
         } else {
-            // 先加载已保存的凭据，再启动静默自动登录
             (async () => {
                 await loadSavedCredentials();
                 await autoLoginOnLoad();
@@ -398,9 +536,9 @@
             const elStatus = document.getElementById('ecStatus');
             elStatus.innerText = statusText;
             if (statusText === '正常') {
-                elStatus.className = "px-2 py-0.5 border border-popCyan/40 bg-popCyan/10 rounded-full text-[10px] font-bold text-popCyan";
+                elStatus.className = "px-2 py-0.5 border border-white/20 bg-green-400/20 rounded-full text-[10px] font-bold text-green-200";
             } else {
-                elStatus.className = "px-2 py-0.5 border border-red-400/40 bg-red-400/10 rounded-full text-[10px] font-bold text-red-400";
+                elStatus.className = "px-2 py-0.5 border border-red-400/40 bg-red-400/10 rounded-full text-[10px] font-bold text-red-200";
             }
             document.getElementById('ecBalance').innerText = balanceText;
         }
@@ -473,7 +611,7 @@
                              const colorIdx = (d + s + idx) % COURSE_COLORS.length;
                              const bgClass = COURSE_COLORS[colorIdx];
                              html += `
-                                <div class="course-card flex-1 ${bgClass} border-2 border-ink rounded-lg p-1.5 shadow-card cursor-pointer flex flex-col justify-between relative overflow-hidden group" title="${course.name}">
+                                <div class="course-card flex-1 ${bgClass} border-2 border-ink rounded-lg p-1.5 shadow-card cursor-pointer flex flex-col justify-between relative overflow-hidden group hover:translate-y-[-2px] hover:shadow-hard transition-all duration-200" title="${course.name}">
                                     <div class="font-black text-[10px] text-ink leading-tight line-clamp-3 z-10 relative mb-1">
                                         ${course.name}
                                     </div>
@@ -510,7 +648,6 @@
                 if (json.code && json.code !== 200) {
                     throw new Error(json.msg || '成绩获取失败');
                 }
-                console.info('[UI] grades response', { code: json.code, itemCount: json?.data?.items?.length || 0 });
                 renderGrades(json.data);
                 panelLoaded.grades = true;
             } catch (e) {
@@ -529,10 +666,8 @@
         function renderGrades(data) {
             if (!data) return;
             const summary = data.summary || {};
-            document.getElementById('gTotal').innerText = summary.totalCourses ?? '--';
             document.getElementById('gCredits').innerText = summary.totalCredits ?? '--';
             document.getElementById('gGpa').innerText = summary.averageGpa ?? '--';
-            document.getElementById('gAvg').innerText = summary.averageScore ?? '--';
             const sourceEl = document.getElementById('gradeSource');
             if (data._source) {
                 sourceEl.innerText = data._source.toUpperCase();
@@ -543,14 +678,20 @@
             }
             const list = document.getElementById('gradeList');
             list.innerHTML = '';
+            
             const items = data.items || [];
+            
+            // 优化空状态显示 (Dashed Box Empty State)
             if (!items.length) {
-                // 教务返回空列表时，提示可能未完成评教或当前无成绩
-                list.innerHTML = `<div class="text-center text-slate-400 text-sm py-6">
-                    教务系统未返回成绩，可能未完成评教或当前无成绩数据，请完成评教后重试。
-                </div>`;
+                list.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                        <div class="text-3xl grayscale opacity-50 mb-2">💯</div>
+                        <div class="text-xs font-bold text-slate-400">暂无成绩数据</div>
+                        <div class="text-[10px] text-slate-300 mt-1">请尝试刷新或评教后再试</div>
+                    </div>`;
                 return;
             }
+
             const groupMap = {};
             items.forEach(item => {
                 const term = item.term || '未知学期';
@@ -573,7 +714,7 @@
             });
             sortedTerms.forEach(term => {
                 list.innerHTML += `
-                    <div class="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] font-black text-slate-600 tracking-wide">
+                    <div class="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] font-black text-slate-600 tracking-wide mt-2">
                         ${term}
                     </div>
                 `;
@@ -585,15 +726,14 @@
                                 <span>性质：${natureText}</span>
                             </div>` : '';
                     list.innerHTML += `
-                        <div class="p-3 border border-slate-200 rounded-xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                        <div class="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-card transition-shadow">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="flex-1 min-w-0">
-                                    <div class="text-[12px] text-slate-500 font-bold">${item.term || ''}</div>
                                     <div class="text-base font-black text-ink leading-tight mt-1 line-clamp-2">${item.courseName}</div>
                                     <div class="text-[11px] text-slate-400 font-mono mt-0.5">${item.courseCode || '--'}</div>
                                 </div>
                                 <div class="flex flex-col items-end text-right">
-                                    <div class="text-lg font-black ${passTag}">${scoreText}</div>
+                                    <div class="text-xl font-black ${passTag}">${scoreText}</div>
                                     <div class="text-[11px] text-slate-500 mt-1">学分 ${item.credit ?? '--'} · 绩点 ${item.gpa ?? '--'}</div>
                                     <div class="text-[10px] text-slate-400">${item.courseNature || '--'}</div>
                                 </div>
@@ -636,13 +776,10 @@
                     return;
                 }
                 const { username, password, remember } = saved;
-                log('load saved credentials', { hasUser: !!username, hasPass: !!password, remember });
                 if (username) document.getElementById('username').value = username;
                 if (password) document.getElementById('password').value = password;
                 if (remember !== undefined) document.getElementById('rememberMe').checked = remember;
-            } catch (e) {
-                console.error('loadSavedCredentials error', e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         async function autoLoginOnLoad() {
@@ -675,21 +812,19 @@
         function togglePanel(name, forceOpen = null) {
             const container = document.getElementById(`panelContent-${name}`);
             const wrapper = document.querySelector(`[data-panel="${name}"]`);
+            const arrow = document.getElementById('gradeArrow');
+            
             const isOpen = !container.classList.contains('hidden');
             const next = forceOpen !== null ? forceOpen : !isOpen;
             container.classList.toggle('hidden', !next);
             wrapper?.setAttribute('data-open', next ? 'true' : 'false');
-
-            if (next && name === 'grades' && !panelLoaded.grades) {
-                loadGrades();
-            }
+            if(arrow) arrow.style.transform = next ? 'rotate(180deg)' : 'rotate(0deg)';
+            if (next && name === 'grades' && !panelLoaded.grades) loadGrades();
         }
 
         function refreshGradesButton() {
             const container = document.getElementById('panelContent-grades');
-            if (container.classList.contains('hidden')) {
-                togglePanel('grades', true);
-            }
+            if (container.classList.contains('hidden')) togglePanel('grades', true);
             loadGrades(true);
         }
 
@@ -699,12 +834,8 @@
                 if (!raw) continue;
                 try {
                     const parsed = JSON.parse(raw);
-                    if (parsed && (parsed.username || parsed.password)) {
-                        return parsed;
-                    }
-                } catch (e) {
-                    console.error('parse cred fail', key, e);
-                }
+                    if (parsed && (parsed.username || parsed.password)) return parsed;
+                } catch (e) {}
             }
             return null;
         }
@@ -713,14 +844,10 @@
             try {
                 const data = JSON.stringify(payload);
                 SAVED_CRED_KEYS.forEach(k => localStorage.setItem(k, data));
-            } catch (e) {
-                console.error('saveCredentialsLocal error', e);
-            }
+            } catch (e) {}
         }
 
-        function clearCredentialsLocal() {
-            SAVED_CRED_KEYS.forEach(k => localStorage.removeItem(k));
-        }
+        function clearCredentialsLocal() { SAVED_CRED_KEYS.forEach(k => localStorage.removeItem(k)); }
 
         function openCredDB() {
             return new Promise((resolve) => {
@@ -728,9 +855,7 @@
                 const req = indexedDB.open(IDB_CONFIG.name, 1);
                 req.onupgradeneeded = () => {
                     const db = req.result;
-                    if (!db.objectStoreNames.contains(IDB_CONFIG.store)) {
-                        db.createObjectStore(IDB_CONFIG.store);
-                    }
+                    if (!db.objectStoreNames.contains(IDB_CONFIG.store)) db.createObjectStore(IDB_CONFIG.store);
                 };
                 req.onsuccess = () => resolve(req.result);
                 req.onerror = () => resolve(null);
@@ -772,16 +897,10 @@
 
         async function handleFetchError(error, retryFn, fallbackMsg = '请求失败') {
             if (error.message === 'SESSION_EXPIRED') {
-                log('session expired, start reauth');
-                if (!reauthPromise) {
-                    reauthPromise = tryAutoRelogin();
-                }
+                if (!reauthPromise) reauthPromise = tryAutoRelogin();
                 const reloginOk = await reauthPromise.catch(() => false);
                 reauthPromise = null;
-                if (reloginOk && typeof retryFn === 'function') {
-                    log('reauth success, retrying');
-                    return retryFn();
-                }
+                if (reloginOk && typeof retryFn === 'function') return retryFn();
                 if (!reauthFailedNotified) {
                     alert('登录已过期，请重新登录');
                     reauthFailedNotified = true;
@@ -789,7 +908,6 @@
                 handleLogout(true);
             } else {
                 alert(fallbackMsg);
-                console.error(error);
             }
         }
 
