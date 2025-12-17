@@ -1,949 +1,1483 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>文理小助手</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        popCyan: '#6AECE1',
-                        popTeal: '#26CCC2',
-                        popYellow: '#FFF57E',
-                        popOrange: '#FFB76C',
-                        popPurple: '#C084FC',
-                        popPink: '#F472B6',
-                        ink: '#134E4A',
-                    },
-                    boxShadow: {
-                        'hard': '4px 4px 0px 0px #134E4A', 
-                        'card': '2px 2px 0px 0px #134E4A',
-                        'float': '6px 6px 0px 0px #134E4A',
-                    },
-                    animation: {
-                        'float': 'float 3s ease-in-out infinite',
-                        'bounce-in': 'bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-                    },
-                    keyframes: {
-                        float: {
-                            '0%, 100%': { transform: 'translateY(0)' },
-                            '50%': { transform: 'translateY(-5px)' },
-                        },
-                        bounceIn: {
-                            '0%': { transform: 'scale(0.8)', opacity: '0' },
-                            '100%': { transform: 'scale(1)', opacity: '1' }
-                        }
-                    }
-                }
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>文理小助手</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
+            mono: ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
+          },
+          colors: {
+            iosBg: '#F2F2F7',
+            iosCard: '#FFFFFF',
+            iosBlue: '#007AFF',
+            iosTeal: '#30B0C7',
+            iosGreen: '#34C759',
+            iosRed: '#FF3B30',
+            iosYellow: '#FFCC00',
+            iosGray: '#8E8E93',
+            iosGrayLight: '#E5E5EA',
+            ink: '#1C1C1E',
+            sub: '#8E8E93',
+          },
+          boxShadow: {
+            'ios-sm': '0 1px 2px rgba(0,0,0,0.05)',
+            'ios-card': '0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+            'ios-float': '0 12px 32px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08)',
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.4s ease-out forwards',
+            'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0', transform: 'scale(0.98)' },
+              '100%': { opacity: '1', transform: 'scale(1)' }
+            },
+            slideUp: {
+              '0%': { transform: 'translateY(100%)' },
+              '100%': { transform: 'translateY(0)' }
             }
+          }
         }
-    </script>
-    <style>
-        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        .hide-scroll::-webkit-scrollbar { display: none; }
-        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-        * { -webkit-tap-highlight-color: transparent; }
-        
-        /* 移动端课表左侧固定列 */
-        .sticky-col { position: sticky; left: 0; z-index: 30; background-color: #F8FAFC; }
-        .sticky-shadow::after {
-            content: ''; position: absolute; top: 0; right: -4px; width: 4px; height: 100%;
-            background: linear-gradient(to right, rgba(0,0,0,0.05), transparent); pointer-events: none;
-        }
-        /* 3D 图标微交互 */
-        .icon-3d { filter: drop-shadow(2px 4px 6px rgba(19, 78, 74, 0.2)); transition: transform 0.3s; }
-        .icon-3d:hover { transform: scale(1.1) rotate(5deg); }
-    </style>
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      background-color: #F2F2F7;
+      -webkit-font-smoothing: antialiased;
+    }
+    .hide-scroll::-webkit-scrollbar { display: none; }
+    .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+    * { -webkit-tap-highlight-color: transparent; }
+
+    /* 移动端课表左侧固定列 - 磨砂效果 */
+    .sticky-col {
+      position: sticky;
+      left: 0;
+      z-index: 30;
+      background-color: rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .sticky-shadow::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 1px;
+      height: 100%;
+      background: #E5E5EA;
+      pointer-events: none;
+    }
+
+    /* 3D 图标 */
+    .icon-3d {
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.08));
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .icon-3d:hover { transform: scale(1.1) rotate(5deg); }
+
+    /* iOS 风格 Checkbox */
+    .ios-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #C6C6C8;
+      border-radius: 50%;
+      display: inline-block;
+      position: relative;
+      transition: all 0.2s;
+      background-color: white;
+    }
+    .ios-checkbox:checked {
+      background-color: #007AFF;
+      border-color: #007AFF;
+    }
+    .ios-checkbox:checked::after {
+      content: '';
+      position: absolute;
+      left: 6px;
+      top: 2px;
+      width: 5px;
+      height: 10px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+  </style>
 </head>
-<!-- 核心布局：限制最大宽度 max-w-xl 并居中，防止大屏拉伸 -->
-<body class="bg-[#F0F4F8] text-ink min-h-[100dvh] flex flex-col py-8 px-4 pb-20 relative max-w-xl mx-auto shadow-[0_0_50px_rgba(0,0,0,0.05)] border-x border-white/50">
 
-    <!-- 背景装饰 Blob -->
-    <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div class="absolute -top-10 -right-10 w-64 h-64 bg-popCyan/10 rounded-full blur-3xl"></div>
-        <div class="absolute top-40 -left-10 w-40 h-40 bg-popPink/10 rounded-full blur-2xl"></div>
+<body class="bg-iosBg text-ink min-h-[100dvh] flex flex-col py-8 px-4 pb-20 relative max-w-xl mx-auto border-x border-white/50 shadow-2xl">
+
+  <!-- 1. 头部区域 -->
+  <header class="mb-8 w-full flex flex-col items-center justify-center animate-fade-in">
+    <div class="flex items-center gap-3">
+      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/School/3D/school_3d.png"
+           class="w-12 h-12 object-contain icon-3d" alt="School">
+      <h1 class="text-2xl font-bold tracking-tight text-ink flex items-center gap-1">
+        文理<span class="text-iosBlue">小助手</span>
+      </h1>
+    </div>
+    <p class="text-[10px] font-semibold text-sub mt-2 tracking-[0.2em] uppercase opacity-70">Hunan University of Arts and Science</p>
+  </header>
+
+  <!-- Loading 遮罩 -->
+  <div id="loading" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/10 backdrop-blur-[2px]"></div>
+    <div class="relative bg-white/80 backdrop-blur-xl px-6 py-5 rounded-2xl shadow-ios-float flex flex-col items-center">
+      <div class="animate-spin rounded-full h-8 w-8 border-[3px] border-gray-200 border-t-iosBlue mb-3"></div>
+      <div class="text-xs font-medium text-sub">加载中...</div>
+    </div>
+  </div>
+
+  <!-- 2. 登录卡片 -->
+  <section id="loginCard" class="w-full bg-iosCard rounded-2xl shadow-ios-card p-6 mb-8 relative overflow-hidden animate-fade-in border border-white/60">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-ink tracking-tight">登录</h2>
+      <div class="flex items-center gap-1.5 bg-gray-100 px-2 py-1 rounded-full border border-gray-100">
+        <div class="w-1.5 h-1.5 rounded-full bg-iosGreen animate-pulse"></div>
+        <span class="text-[11px] font-semibold text-sub">ONLINE</span>
+      </div>
     </div>
 
-    <!-- 1. 头部区域：横向布局，稳重且美观 -->
-    <header class="mb-8 w-full flex flex-col items-center justify-center animate-float">
+    <div class="space-y-4">
+      <!-- Username -->
+      <div class="group">
+        <label class="block text-[11px] font-semibold mb-1.5 ml-1 text-sub flex items-center gap-1.5 uppercase tracking-wide">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Identification%20card/3D/identification_card_3d.png" class="w-4 h-4 grayscale opacity-70">
+          学号
+        </label>
+        <input type="text" id="username"
+               class="w-full text-[17px] bg-iosGrayLight/50 border border-transparent rounded-xl px-4 py-3 font-medium focus:bg-white focus:border-iosBlue focus:ring-4 focus:ring-iosBlue/10 transition-all placeholder:text-gray-400 focus:outline-none"
+               placeholder="请输入学号">
+      </div>
+
+      <!-- Password -->
+      <div class="group">
+        <label class="block text-[11px] font-semibold mb-1.5 ml-1 text-sub flex items-center gap-1.5 uppercase tracking-wide">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Key/3D/key_3d.png" class="w-4 h-4 grayscale opacity-70">
+          密码
+        </label>
+        <input type="password" id="password"
+               class="w-full text-[17px] bg-iosGrayLight/50 border border-transparent rounded-xl px-4 py-3 font-medium focus:bg-white focus:border-iosBlue focus:ring-4 focus:ring-iosBlue/10 transition-all placeholder:text-gray-400 focus:outline-none"
+               placeholder="智慧文理密码">
+      </div>
+
+      <!-- Captcha：按需加载（仅 NEED_CAPTCHA 或用户点击刷新时请求） -->
+      <div id="captchaBlock" class="hidden">
+        <label class="block text-[11px] font-semibold mb-1.5 ml-1 text-sub">验证码</label>
+        <div class="flex gap-3 h-[48px]">
+          <input type="text" id="captcha" placeholder="ABCD"
+                 class="flex-1 min-w-0 text-[17px] bg-iosGrayLight/50 border border-transparent rounded-xl px-4 font-medium uppercase focus:bg-white focus:border-iosBlue focus:ring-4 focus:ring-iosBlue/10 transition-all focus:outline-none">
+          <div class="w-28 rounded-xl bg-gray-50 cursor-pointer overflow-hidden relative group shrink-0 active:opacity-70 transition-opacity border border-gray-200"
+               onclick="initCaptcha(true, true)">
+            <img id="captchaImg" class="w-full h-full object-fill hidden">
+            <div id="captchaText" class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-iosBlue/70">点击刷新</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Remember Me -->
+      <div class="flex items-center justify-between pt-1">
+        <label class="flex items-center gap-2.5 cursor-pointer select-none group py-1">
+          <input id="rememberMe" type="checkbox" class="ios-checkbox">
+          <span class="text-[15px] text-ink font-medium">记住我</span>
+        </label>
+      </div>
+
+      <button id="loginBtn" onclick="handleLogin()"
+              class="w-full bg-iosBlue text-white text-[17px] font-bold py-3.5 rounded-xl shadow-sm hover:bg-iosBlue/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-2">
+        <span>进入系统</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- 数据展示区域 -->
+  <section id="dataArea" class="hidden w-full space-y-6 animate-slide-up">
+
+    <!-- 3. 个人信息卡片 -->
+    <div class="bg-iosCard rounded-2xl shadow-ios-card p-4 flex items-center gap-4 relative overflow-hidden border border-white/60 group">
+      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Identification%20card/3D/identification_card_3d.png"
+           class="absolute -right-4 -bottom-4 w-24 h-24 opacity-10 rotate-[-15deg] pointer-events-none grayscale">
+
+      <!-- 头像：Apple emoji 🎄（iOS 默认显示 Apple 风格） -->
+      <div class="w-16 h-16 bg-gray-100 rounded-full border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden shadow-inner z-10">
+        <div id="userAvatar" class="w-full h-full flex items-center justify-center text-[34px] leading-none select-none">🎄</div>
+      </div>
+
+      <div class="flex-1 min-w-0 z-10">
+        <div class="flex items-center gap-2 mb-0.5">
+          <h2 class="text-[20px] font-bold text-ink tracking-tight truncate" id="uiName">--</h2>
+          <span class="px-1.5 py-[1px] rounded bg-iosBlue/10 text-iosBlue text-[10px] font-bold border border-iosBlue/10">STUDENT</span>
+        </div>
+        <div class="space-y-0.5 text-sub text-[13px] font-medium">
+          <div class="flex items-center gap-1.5">
+            <span class="opacity-70">ID</span>
+            <span id="uiId" class="font-mono text-ink">--</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="opacity-70">CL</span>
+            <span id="uiClass" class="text-ink truncate">--</span>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="handleLogout(true)"
+              class="shrink-0 p-2 text-sub hover:text-iosRed bg-gray-50 hover:bg-red-50 rounded-full transition-all z-10"
+              title="退出登录">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- 4. 一卡通卡片 -->
+    <div class="w-full bg-white border border-gray-200 rounded-2xl shadow-ios-card p-5 flex flex-col justify-between relative overflow-hidden h-[150px] group transition-all hover:shadow-ios-float active:scale-[0.99]">
+      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Credit%20card/3D/credit_card_3d.png"
+           class="absolute -right-4 -bottom-4 w-24 h-24 opacity-20 rotate-[-10deg] group-hover:rotate-0 group-hover:scale-105 transition-all duration-300 z-0 grayscale">
+
+      <div class="flex justify-between items-start z-10 relative">
         <div class="flex items-center gap-3">
-            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/School/3D/school_3d.png" 
-                 class="w-12 h-12 object-contain drop-shadow-sm icon-3d" alt="School">
-            <h1 class="text-3xl font-black tracking-tighter text-ink flex items-center gap-1">
-                文理<span class="text-popTeal underline decoration-4 decoration-popYellow underline-offset-4">小助手</span>
-            </h1>
+          <svg width="36" height="26" viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-sm">
+            <rect width="40" height="28" rx="4" fill="#F0F0F0"/>
+            <rect x="2" y="2" width="36" height="24" rx="2" stroke="#999" stroke-opacity="0.2" stroke-width="1"/>
+            <path d="M12 2V26" stroke="#999" stroke-opacity="0.3" stroke-width="1.5"/>
+            <path d="M28 2V26" stroke="#999" stroke-opacity="0.3" stroke-width="1.5"/>
+            <path d="M2 14H12" stroke="#999" stroke-opacity="0.3" stroke-width="1.5"/>
+            <path d="M28 14H38" stroke="#999" stroke-opacity="0.3" stroke-width="1.5"/>
+            <rect x="15" y="8" width="10" height="12" rx="2" stroke="#999" stroke-opacity="0.3" stroke-width="1.5"/>
+          </svg>
+          <span class="text-[11px] font-bold tracking-widest uppercase text-sub mt-1">Campus Card</span>
         </div>
-        <p class="text-[10px] font-bold text-slate-400 mt-2 tracking-[0.2em] uppercase">Hunan University of Arts and Science</p>
-    </header>
+        <span class="px-2 py-0.5 bg-gray-100 rounded border border-gray-200 text-[10px] font-bold text-sub" id="ecStatus">--</span>
+      </div>
 
-    <!-- Loading 遮罩 -->
-    <div id="loading" class="hidden fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
-        <div class="relative">
-            <div class="animate-spin rounded-full h-12 w-12 border-[5px] border-slate-200 border-t-popTeal mb-4"></div>
+      <div class="z-10 mt-1 flex justify-between items-end relative">
+        <div class="flex flex-col">
+          <span class="text-[10px] text-sub font-semibold uppercase mb-0.5 ml-0.5">Balance</span>
+          <div class="text-4xl font-bold tracking-tighter flex items-baseline gap-1 text-ink">
+            <span class="text-lg text-iosYellow font-bold">¥</span>
+            <span id="ecBalance" class="drop-shadow-sm">--</span>
+          </div>
         </div>
-        <div class="font-black bg-popYellow px-4 py-1 border-2 border-ink shadow-hard text-xs rounded-full">数据加载中...</div>
-    </div>
-
-    <!-- 2. 登录卡片 -->
-    <section id="loginCard" class="w-full bg-white border-2 border-ink rounded-xl shadow-float p-6 mb-8 relative overflow-hidden">
-        <div class="absolute -right-4 -top-4 w-20 h-20 bg-popYellow/30 rounded-full blur-xl"></div>
-        
-        <div class="flex items-center justify-between mb-6 relative z-10">
-            <h2 class="text-2xl font-black italic text-ink">登录</h2>
-            <div class="flex items-center gap-2 bg-slate-100 px-2 py-1 rounded border border-ink/20">
-                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <span class="text-[10px] font-bold text-slate-400">ONLINE</span>
-            </div>
-        </div>
-
-        <div class="space-y-5 relative z-10">
-            <div class="relative group">
-                <label class="block text-xs font-bold mb-1.5 ml-1 text-slate-500 flex items-center gap-1">
-                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Identification%20card/3D/identification_card_3d.png" class="w-4 h-4">
-                    学号
-                </label>
-                <input type="text" id="username" class="w-full text-base bg-slate-50 border-2 border-ink rounded-xl p-3 pl-4 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal placeholder:text-slate-300 focus:bg-white" placeholder="请输入学号">
-            </div>
-            <div class="relative group">
-                <label class="block text-xs font-bold mb-1.5 ml-1 text-slate-500 flex items-center gap-1">
-                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Key/3D/key_3d.png" class="w-4 h-4">
-                    密码
-                </label>
-                <input type="password" id="password" class="w-full text-base bg-slate-50 border-2 border-ink rounded-xl p-3 pl-4 font-bold focus:outline-none focus:border-popTeal focus:shadow-hard transition-all placeholder:font-normal placeholder:text-slate-300 focus:bg-white" placeholder="智慧文理密码">
-            </div>
-            <div id="captchaBlock" class="hidden">
-                <label class="block text-xs font-bold mb-1 ml-1 text-slate-500">验证码</label>
-                <div class="flex gap-2 h-[50px]">
-                    <input type="text" id="captcha" placeholder="ABCD" class="flex-1 min-w-0 text-base bg-slate-50 border-2 border-ink rounded-xl p-3 font-bold uppercase focus:outline-none focus:border-popTeal focus:shadow-hard transition-all">
-                    <div class="w-28 border-2 border-ink rounded-xl bg-slate-100 cursor-pointer overflow-hidden relative group shrink-0 active:scale-95 transition-transform shadow-card" onclick="initCaptcha(true)">
-                        <img id="captchaImg" class="w-full h-full object-fill hidden">
-                        <div id="captchaText" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:text-popTeal">点击刷新</div>
-                    </div>
-                </div>
-            </div>
-            <div class="flex items-center justify-between">
-                <label class="flex items-center gap-2 text-xs font-bold text-slate-500 select-none cursor-pointer">
-                    <input id="rememberMe" type="checkbox" class="w-4 h-4 border-2 border-ink rounded checked:bg-popTeal checked:border-ink focus:ring-0 transition-colors">
-                    记住我
-                </label>
-            </div>
-            <button onclick="handleLogin()" class="w-full bg-popTeal border-2 border-ink text-white text-lg font-black py-3 rounded-xl shadow-hard hover:translate-y-[-2px] hover:bg-popTeal/90 transition-all active:translate-y-0 active:shadow-none mt-2 flex items-center justify-center gap-2 group">
-                <span>进入系统</span>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-5 h-5 group-hover:translate-x-1 transition-transform">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                </svg>
-            </button>
-        </div>
-    </section>
-
-    <!-- 数据展示区域 -->
-    <section id="dataArea" class="hidden w-full space-y-6">
-        
-        <!-- 3. 个人信息卡片 (ID Card 风格，整洁紧凑) -->
-        <div class="bg-white border-2 border-ink rounded-xl shadow-card relative overflow-hidden group">
-             <!-- 背景装饰水印 -->
-            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Identification%20card/3D/identification_card_3d.png" 
-            class="absolute -right-4 -bottom-4 w-24 h-24 opacity-10 rotate-[-15deg] pointer-events-none grayscale">
-            
-            <div class="p-4 flex items-center gap-4 relative z-10">
-                <!-- 头像：圆角矩形 -->
-                <div class="w-16 h-16 bg-indigo-50 rounded-xl border-2 border-ink flex items-center justify-center shrink-0 overflow-hidden shadow-[2px_2px_0_0_#134E4A]">
-                    <img id="userAvatar" src="" alt="Avatar" class="w-full h-full object-cover">
-                </div>
-
-                <!-- 中间信息 -->
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1">
-                        <h2 class="text-xl font-black text-ink tracking-tight truncate" id="uiName">--</h2>
-                        <!-- 身份标签 -->
-                        <span class="px-1.5 py-[2px] rounded bg-popPink border border-ink text-white text-[9px] font-black shadow-[1px_1px_0_0_#134E4A]">STUDENT</span>
-                    </div>
-                    <div class="space-y-0.5">
-                        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                            <span class="w-3.5 h-3.5 flex items-center justify-center bg-slate-100 rounded border border-slate-200 text-[8px] text-slate-400">ID</span>
-                            <span id="uiId" class="font-mono tracking-wide">--</span>
-                        </div>
-                        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                            <span class="w-3.5 h-3.5 flex items-center justify-center bg-slate-100 rounded border border-slate-200 text-[8px] text-slate-400">CL</span>
-                            <span id="uiClass" class="truncate">--</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 退出按钮 (Flex 布局，靠右对齐) -->
-                <button onclick="handleLogout()" class="shrink-0 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="退出登录">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- 4. 一卡通卡片 (SVG 芯片，深色质感) -->
-        <div class="w-full text-white border-2 border-ink rounded-xl shadow-card p-5 flex flex-col justify-between relative overflow-hidden h-[140px] group transition-all hover:shadow-hard">
-            <!-- 3D 信用卡图标装饰 -->
-            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Credit%20card/3D/credit_card_3d.png" 
-                    class="absolute -right-5 -bottom-6 w-24 h-24 opacity-90 rotate-[-15deg] group-hover:rotate-0 group-hover:scale-110 transition-all duration-300 z-0 drop-shadow-lg">
-            
-            <!-- 深色背景与纹理 -->
-            <div class="absolute inset-0 bg-[#134E4A] z-[-1]"></div>
-            <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 10px 10px;"></div>
-
-            <!-- 顶部：芯片与标题 -->
-            <div class="flex justify-between items-start z-10 relative">
-                <div class="flex items-center gap-3">
-                    <!-- SVG 矢量芯片 (清晰锐利) -->
-                    <svg width="36" height="26" viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-sm">
-                        <rect width="40" height="28" rx="4" fill="#FCD34D"/> <!-- 金色底 -->
-                        <rect x="2" y="2" width="36" height="24" rx="2" stroke="#B45309" stroke-opacity="0.2" stroke-width="1"/>
-                        <path d="M12 2V26" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
-                        <path d="M28 2V26" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
-                        <path d="M2 14H12" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
-                        <path d="M28 14H38" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
-                        <rect x="15" y="8" width="10" height="12" rx="2" stroke="#B45309" stroke-opacity="0.3" stroke-width="1.5"/>
-                    </svg>
-                    <span class="text-[10px] font-black tracking-widest opacity-80 uppercase text-yellow-50/70 mt-1">Campus Card</span>
-                </div>
-                <!-- 状态标签 -->
-                <span class="px-2 py-0.5 border border-white/20 bg-white/10 rounded-full text-[10px] font-bold backdrop-blur-sm" id="ecStatus">--</span>
-            </div>
-
-            <!-- 底部：余额与刷新 -->
-            <div class="z-10 mt-1 flex justify-between items-end relative">
-                <div class="flex flex-col">
-                    <span class="text-[9px] text-white/50 font-bold uppercase mb-0.5 ml-0.5">Balance</span>
-                    <div class="text-4xl font-black tracking-tighter flex items-baseline gap-1">
-                        <span class="text-lg text-popYellow font-bold">¥</span>
-                        <span id="ecBalance" class="text-white drop-shadow-md">--</span>
-                    </div>
-                </div>
-                <button onclick="loadEcard(true)" class="p-2 rounded-full bg-white/10 border border-white/10 hover:bg-white/20 hover:rotate-180 transition-all active:scale-90 mb-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- 课表 -->
-        <div class="bg-white border-2 border-ink rounded-xl shadow-hard overflow-hidden">
-            <div class="flex items-center justify-between p-4 border-b-2 border-slate-100 bg-slate-50/50">
-                <div class="flex items-center gap-3">
-                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Spiral%20calendar/3D/spiral_calendar_3d.png" class="w-8 h-8 icon-3d">
-                    <div>
-                        <h3 class="text-lg font-black tracking-tight leading-none text-ink">本周课表</h3>
-                        <span class="text-[10px] font-bold text-slate-400" id="schWeek">Loading...</span>
-                    </div>
-                </div>
-                <button onclick="loadSchedule(true)" class="text-[10px] font-bold bg-white px-3 py-1.5 border-2 border-slate-200 rounded-lg text-slate-600 hover:border-popTeal hover:text-popTeal active:scale-95 transition-all shadow-sm">
-                    刷新
-                </button>
-            </div>
-            <div class="overflow-x-auto hide-scroll pb-2 bg-white">
-                <div class="min-w-[160vw] md:min-w-full" id="scheduleContainer"></div>
-            </div>
-        </div>
-
-        <!-- 5. 成绩 (美化统计框 + 空状态) -->
-        <div class="bg-white border-2 border-ink rounded-xl shadow-hard overflow-hidden transition-all duration-300" data-panel="grades" data-open="false">
-            <div class="flex items-center justify-between p-4 border-b-2 border-slate-100 bg-slate-50/50 cursor-pointer hover:bg-slate-50" onclick="togglePanel('grades')">
-                <div class="flex items-center gap-3">
-                    <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Trophy/3D/trophy_3d.png" class="w-8 h-8 icon-3d">
-                    <div class="flex flex-col items-start">
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-lg font-black tracking-tight leading-none text-ink">成绩单</h3>
-                            <span id="gradeSource" class="px-1.5 py-0.5 text-[9px] font-black bg-slate-200 rounded text-slate-500 hidden transform scale-90 origin-left"></span>
-                        </div>
-                        <span class="text-[10px] font-bold text-slate-400">点击展开/收起</span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="event.stopPropagation(); refreshGradesButton()" class="text-[10px] font-bold bg-white px-3 py-1.5 border-2 border-slate-200 rounded-lg text-slate-600 hover:border-popOrange hover:text-popOrange active:scale-95 transition-all shadow-sm">
-                        刷新
-                    </button>
-                    <div class="w-6 h-6 flex items-center justify-center transition-transform duration-300" id="gradeArrow">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-4 h-4 text-slate-400">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="panelContent-grades" class="hidden">
-                <div class="p-4 space-y-5 bg-[#F8FAFC]">
-                    <!-- 统计数据卡片：加重样式 (边框+阴影) -->
-                    <div class="grid grid-cols-2 gap-4 text-sm font-bold">
-                        <!-- 学分卡片 -->
-                        <div class="p-3 bg-white border-2 border-ink rounded-xl shadow-card flex flex-col items-center justify-center text-center relative overflow-hidden">
-                            <div class="absolute top-0 right-0 w-8 h-8 bg-popTeal/10 rounded-bl-xl"></div>
-                            <div class="text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-black">Credits</div>
-                            <div id="gCredits" class="text-2xl font-black text-popTeal tracking-tight">--</div>
-                        </div>
-                        <!-- GPA卡片 -->
-                        <div class="p-3 bg-white border-2 border-ink rounded-xl shadow-card flex flex-col items-center justify-center text-center relative overflow-hidden">
-                             <div class="absolute top-0 right-0 w-8 h-8 bg-popOrange/10 rounded-bl-xl"></div>
-                            <div class="text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-black">GPA</div>
-                            <div id="gGpa" class="text-2xl font-black text-popOrange tracking-tight">--</div>
-                        </div>
-                    </div>
-                    
-                    <!-- 成绩列表容器 -->
-                    <div id="gradeList" class="space-y-3 min-h-[100px]"></div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- 底部区域 -->
-    <footer class="mt-8 mb-4 w-full flex justify-center">
-        <button onclick="toggleAboutModal(true)" class="group flex items-center gap-2 px-5 py-2 rounded-full bg-white border border-ink/10 shadow-sm hover:shadow-card hover:border-ink hover:-translate-y-1 transition-all duration-300">
-            <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Information/3D/information_3d.png" class="w-5 h-5 group-hover:rotate-12 transition-transform">
-            <span class="text-xs font-bold text-slate-500 group-hover:text-ink">关于服务</span>
+        <button onclick="loadEcard(true)" class="p-2 rounded-full bg-gray-50 border border-gray-100 hover:bg-gray-100 active:scale-90 transition-all text-sub">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
         </button>
-    </footer>
-
-    <!-- 关于服务 Modal -->
-    <div id="aboutModal" class="hidden fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm transition-opacity" onclick="toggleAboutModal(false)"></div>
-        <div class="bg-white border-2 border-ink rounded-2xl shadow-float w-full max-w-sm p-6 relative z-10 animate-float-up transform transition-all">
-            <button onclick="toggleAboutModal(false)" class="absolute top-4 right-4 p-1 hover:bg-slate-100 rounded-full transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 text-slate-400">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-            </button>
-            <div class="text-center mb-6">
-                <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Rocket/3D/rocket_3d.png" 
-     width="80" height="80" 
-     style="margin: 0 auto 12px auto; filter: drop-shadow(4px 4px 8px rgba(0,0,0,0.15)); display: block;"
-     alt="Rocket">
-                <h3 class="text-xl font-black text-ink">关于文理小助手</h3>
-                <p class="text-xs font-bold text-slate-400 mt-1">Version 1.0.3 (Stable)</p>
-            </div>
-            <div class="space-y-3 text-sm font-medium text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
-                <p>🎓 <strong class="text-ink">纯净体验：</strong><br>无广告、无推广，仅提供最核心的查询服务。</p>
-                <p>🔒 <strong class="text-ink">安全直连：</strong><br>数据仅在本地与教务系统交互，不存储密码。</p>
-                <p>🔨 <strong class="text-ink">反映问题联系我：</strong><br>微信：-nullsleep</p>
-                <p>
-                    📶 <strong class="text-ink">状态</strong><br>
-                    <a
-                        href="http://8.134.208.242:13001/dashboard"
-                        class="text-ink"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style="text-decoration: underline; cursor: pointer;"
-                    >
-                        点击查看服务器状态
-                    </a>
-                </p>
-            </div>
-            <button onclick="toggleAboutModal(false)" class="w-full bg-popYellow border-2 border-ink text-ink font-black py-3 rounded-xl shadow-card active:shadow-none active:translate-y-[2px] transition-all">我知道了</button>
-        </div>
+      </div>
     </div>
 
-    <script>
-        const API_BASE = ''; 
-        
-        let currentSessionId = '';
-        let requireCaptcha = false;
-        let isRelogging = false;
-        let reauthPromise = null;
-        let reauthFailedNotified = false;
-        const log = (...args) => console.log('[UI]', ...args);
-        let globalToken = localStorage.getItem('huas_token') || '';
-        const panelLoaded = { schedule: false, grades: false };
-        const SAVED_CRED_KEY = 'huas_saved_cred';
-        const SAVED_CRED_KEYS = [SAVED_CRED_KEY, 'huas_saved_cred_bak1', 'huas_saved_cred_bak2'];
-        const IDB_CONFIG = { name: 'huasCredDB', store: 'creds', key: 'primary' };
-        let autoLoginAttempted = false;
+    <!-- 课表 -->
+    <div class="bg-iosCard rounded-2xl shadow-ios-card overflow-hidden border border-white/60">
+      <div class="flex items-center justify-between p-4 border-b border-gray-100 bg-white/50 backdrop-blur-sm">
+        <div class="flex items-center gap-3">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Spiral%20calendar/3D/spiral_calendar_3d.png" class="w-8 h-8 icon-3d">
+          <div>
+            <h3 class="text-[17px] font-bold tracking-tight text-ink">本周课表</h3>
+            <span class="text-[11px] font-medium text-sub" id="schWeek">Loading...</span>
+          </div>
+        </div>
+        <button onclick="loadSchedule(true)" class="text-[13px] font-bold text-iosBlue bg-iosBlue/5 px-3 py-1.5 rounded-full hover:bg-iosBlue/10 active:scale-95 transition-all">
+          刷新
+        </button>
+      </div>
+      <div class="overflow-x-auto hide-scroll pb-2 bg-white">
+        <div class="min-w-[160vw] md:min-w-full" id="scheduleContainer"></div>
+      </div>
+    </div>
 
-        const COURSE_COLORS = [
-            'bg-popCyan', 'bg-popYellow', 'bg-popOrange', 'bg-popPurple', 
-            'bg-popPink', 'bg-[#A5F3FC]', 'bg-[#FDA4AF]'
-        ];
+    <!-- 5. 成绩 -->
+    <div class="bg-iosCard rounded-2xl shadow-ios-card overflow-hidden transition-all duration-300 border border-white/60" data-panel="grades" data-open="false">
+      <div class="flex items-center justify-between p-4 border-b border-gray-100 cursor-pointer active:bg-gray-50 transition-colors" onclick="togglePanel('grades')">
+        <div class="flex items-center gap-3">
+          <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Trophy/3D/trophy_3d.png" class="w-8 h-8 icon-3d">
+          <div class="flex flex-col items-start">
+            <div class="flex items-center gap-2">
+              <h3 class="text-[17px] font-bold tracking-tight text-ink">成绩单</h3>
+              <span id="gradeSource" class="px-1.5 py-0.5 text-[10px] font-bold bg-gray-100 rounded text-sub hidden transform scale-90 origin-left"></span>
+            </div>
+            <span class="text-[11px] font-medium text-sub">点击展开/收起</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="event.stopPropagation(); refreshGradesButton()"
+                  class="text-[13px] font-bold text-iosBlue bg-iosBlue/5 px-3 py-1.5 rounded-full hover:bg-iosBlue/10 active:scale-95 transition-all">
+            刷新
+          </button>
+          <div class="w-6 h-6 flex items-center justify-center transition-transform duration-300" id="gradeArrow">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 text-gray-400">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+          </div>
+        </div>
+      </div>
 
-        function toggleAboutModal(show) {
-            const modal = document.getElementById('aboutModal');
-            if (show) {
-                modal.classList.remove('hidden');
-                modal.querySelector('div.bg-white').classList.add('animate-bounce-in');
-            } else {
-                modal.classList.add('hidden');
-            }
+      <div id="panelContent-grades" class="hidden bg-iosBg">
+        <div class="p-4 space-y-4">
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="p-3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
+              <div class="text-[10px] text-sub mb-1 uppercase tracking-wider font-bold">Credits</div>
+              <div id="gCredits" class="text-2xl font-bold text-ink tracking-tight">--</div>
+            </div>
+            <div class="p-3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
+              <div class="text-[10px] text-sub mb-1 uppercase tracking-wider font-bold">GPA</div>
+              <div id="gGpa" class="text-2xl font-bold text-iosTeal tracking-tight">--</div>
+            </div>
+          </div>
+
+          <div id="gradeList" class="space-y-4 min-h-[100px]"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 底部区域 -->
+  <footer class="mt-8 mb-4 w-full flex justify-center">
+    <button onclick="toggleAboutModal(true)"
+            class="group flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
+      <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Information/3D/information_3d.png" class="w-4 h-4 group-hover:rotate-12 transition-transform">
+      <span class="text-[12px] font-semibold text-sub group-hover:text-ink">关于服务</span>
+    </button>
+  </footer>
+
+  <!-- 关于服务 Modal -->
+  <div id="aboutModal" class="hidden fixed inset-0 z-50 flex items-center justify-center px-6">
+    <div class="absolute inset-0 bg-black/20 backdrop-blur-[2px] transition-opacity" onclick="toggleAboutModal(false)"></div>
+    <div class="bg-white/90 backdrop-blur-xl rounded-2xl shadow-ios-float w-full max-w-sm p-6 relative z-10 animate-fade-in text-center">
+      <div class="mb-5">
+        <img src="https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@latest/assets/Rocket/3D/rocket_3d.png"
+             width="64" height="64"
+             class="mx-auto mb-3 drop-shadow-md icon-3d"
+             alt="Rocket">
+        <h3 class="text-lg font-bold text-ink">关于文理小助手</h3>
+        <p class="text-[11px] font-medium text-sub mt-1">Version 1.0.3 (Stable)</p>
+      </div>
+
+      <div class="space-y-3 text-[13px] font-medium text-sub leading-relaxed bg-gray-50/50 p-4 rounded-xl border border-gray-100 mb-6 text-left">
+        <p class="flex gap-2"><span>🎓</span> <span class="text-ink">纯净无广，仅提供核心查询。</span></p>
+        <p class="flex gap-2"><span>🔒</span> <span class="text-ink">本地直连，不存储任何密码。</span></p>
+        <p class="flex gap-2"><span>🔨</span> <span class="text-ink">反馈联系：-nullsleep</span></p>
+        <p class="flex gap-2">
+          <span>📶</span>
+          <a href="http://8.134.208.242:13001/dashboard" class="text-iosBlue font-semibold underline decoration-iosBlue/30 underline-offset-2" target="_blank">
+            查看服务器状态
+          </a>
+        </p>
+      </div>
+
+      <button onclick="toggleAboutModal(false)" class="w-full bg-iosBlue text-white font-bold py-3 rounded-xl active:opacity-70 transition-opacity">我知道了</button>
+    </div>
+  </div>
+
+  <script>
+    /*****************************************************************
+     * ✅ 本次修复（针对你提出的问题）
+     *
+     * 现象：
+     *   localStorage.removeItem('huas_token'); globalToken = '';
+     *   然后触发刷新，只弹“请先登录”，不会自动重登。
+     *
+     * 根因：
+     *   之前 loadXxx() 顶部 if (!globalToken) 直接 return / alert，
+     *   请求根本没发出去，因此 apiFetch 的 401 自动重登链路没机会跑。
+     *
+     * 修复：
+     *   1) apiFetch：即使没有 token 也会尝试 ensureRelogin()（quiet 自动登录）
+     *   2) 移除各 loadXxx 顶部的 “无 token 直接 return alert”
+     *   3) 保持健壮性：single-flight 重登、重试一次、验证码按需、错误分流
+     *
+     * 额外增强（健壮性）：
+     *   - sessionVersion 仅在 logout 时递增（避免“自动重登”导致响应被误判为 stale）
+     *   - authVersion 记录 token 变更（便于调试追踪）
+     *   - handleLogout 支持 keepCaptchaState：自动重登遇到 NEED_CAPTCHA 时可保留验证码状态
+     *   - 调试信息全覆盖：每个关键分支都 console.log / warn / error
+     *****************************************************************/
+
+    const API_BASE = '';  // 同源部署建议留空
+    const DEBUG = true;   // 关闭日志可设 false
+
+    // iOS 低饱和糖果色
+    const COURSE_COLORS = [
+      'bg-[#E8F2FF] border-[#B6D6F5] text-[#004085]',
+      'bg-[#E8F8F5] border-[#A3E4D7] text-[#0E6251]',
+      'bg-[#FEF9E7] border-[#F9E79F] text-[#9C640C]',
+      'bg-[#FFF0F0] border-[#F5B7B1] text-[#922B21]',
+      'bg-[#F3E5F5] border-[#D7BDE2] text-[#6A1B9A]',
+      'bg-[#E0F2F1] border-[#80CBC4] text-[#004D40]',
+      'bg-[#FBE9E7] border-[#FFCCBC] text-[#BF360C]'
+    ];
+
+    /***********************
+     * 0) 日志工具（全覆盖）
+     ***********************/
+    const log  = (...args) => DEBUG && console.log('%c[UI]', 'color:#007AFF;font-weight:bold', ...args);
+    const warn = (...args) => DEBUG && console.warn('%c[UI]', 'color:#FF9500;font-weight:bold', ...args);
+    const err  = (...args) => DEBUG && console.error('%c[UI]', 'color:#FF3B30;font-weight:bold', ...args);
+    function group(title, fn) {
+      if (!DEBUG) return fn();
+      console.groupCollapsed(`%c[UI] ${title}`, 'color:#007AFF;font-weight:bold');
+      try { return fn(); } finally { console.groupEnd(); }
+    }
+
+    /***********************
+     * 1) 全局状态
+     ***********************/
+    let currentSessionId = '';
+    let requireCaptcha = false;
+
+    // 单飞重登 Promise：多个请求同时触发只登录一次
+    let reauthPromise = null;
+    let isRelogging = false;
+
+    // 登录互斥锁：防止用户狂点“进入系统”
+    let loginPromise = null;
+
+    // ✅ 只在 logout 时递增：用于防止“登出后旧请求写回”
+    let sessionVersion = 0;
+
+    // ✅ 仅用于调试：每次 token 变更都会递增（观察 token 生命周期）
+    let authVersion = 0;
+
+    // 面板加载标记
+    const panelLoaded = { schedule: false, grades: false, ecard: false, user: false };
+    let autoLoginAttempted = false;
+
+    // token（运行态）与本地存储
+    let globalToken = localStorage.getItem('huas_token') || '';
+
+    // 保存凭据（按你要求：不改“#6”，仍保留明文存储逻辑）
+    const SAVED_CRED_KEY = 'huas_saved_cred';
+    const SAVED_CRED_KEYS = [SAVED_CRED_KEY, 'huas_saved_cred_bak1', 'huas_saved_cred_bak2'];
+    const IDB_CONFIG = { name: 'huasCredDB', store: 'creds', key: 'primary' };
+
+    // 防重复弹窗
+    let reauthFailedNotified = false;
+    let noTokenNotified = false;
+
+    /***********************
+     * 2) UI 工具
+     ***********************/
+    function setLoading(isLoading) {
+      document.getElementById('loading').classList.toggle('hidden', !isLoading);
+    }
+    function showLogin() {
+      document.getElementById('dataArea').classList.add('hidden');
+      document.getElementById('loginCard').classList.remove('hidden');
+    }
+    function showData() {
+      document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('dataArea').classList.remove('hidden');
+    }
+    function bumpSessionVersion(reason = '') {
+      sessionVersion += 1;
+      log('sessionVersion++ =>', sessionVersion, reason ? `(reason: ${reason})` : '');
+    }
+    function setLoginButtonDisabled(disabled) {
+      const btn = document.getElementById('loginBtn');
+      if (!btn) return;
+      btn.disabled = disabled;
+      btn.classList.toggle('opacity-60', disabled);
+      btn.classList.toggle('pointer-events-none', disabled);
+    }
+    function toggleAboutModal(show) {
+      const modal = document.getElementById('aboutModal');
+      modal.classList.toggle('hidden', !show);
+    }
+
+    /***********************
+     * 3) Token 统一入口（保证日志/版本一致）
+     *
+     * - 所有设置 token 的地方必须走 setToken()
+     * - 便于调试 token 是谁改的、何时改的
+     ***********************/
+    function setToken(token, reason = '') {
+      globalToken = token || '';
+      authVersion += 1;
+
+      if (globalToken) localStorage.setItem('huas_token', globalToken);
+      else localStorage.removeItem('huas_token');
+
+      log('setToken()', {
+        authVersion,
+        hasToken: !!globalToken,
+        tokenPreview: globalToken ? String(globalToken).slice(0, 12) + '...' : '',
+        reason
+      });
+    }
+
+    /***********************
+     * 4) Fetch 封装（核心修复：NO_TOKEN 也自动登录）
+     *
+     * ✅ 行为：
+     *   - 如果没有 token：先 ensureRelogin()（quiet 自动登录）
+     *   - 如果 401：再 ensureRelogin()，成功后重试一次
+     *   - retry=false：避免无限递归/死循环
+     ***********************/
+    async function apiFetch(path, { method = 'GET', headers = {}, body, cache = 'no-store', retry = true } = {}) {
+      const url = `${API_BASE}${path}`;
+
+      // ✅ 关键修复：无 token 不再直接失败，而是尝试自动登录
+      if (!globalToken) {
+        warn('apiFetch: NO_TOKEN -> try ensureRelogin()', { url, retry, authVersion, sessionVersion });
+
+        if (!retry) throw new Error('NO_TOKEN');
+
+        const ok = await ensureRelogin('NO_TOKEN');
+        if (!ok || !globalToken) {
+          warn('apiFetch: ensureRelogin failed -> still NO_TOKEN', { url, ok, hasToken: !!globalToken });
+          throw new Error('NO_TOKEN');
         }
+
+        log('apiFetch: ensureRelogin success -> token restored', { url, authVersion });
+      }
+
+      log('apiFetch ->', { url, method, retry, hasToken: !!globalToken, authVersion, sessionVersion });
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          ...headers,
+          Authorization: globalToken,
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        cache
+      });
+
+      // 非 401：直接返回
+      if (res.status !== 401) return res;
+
+      // 401：会话过期
+      warn('apiFetch: got 401 -> SESSION_EXPIRED', { url, retry });
+
+      if (!retry) throw new Error('SESSION_EXPIRED');
+
+      const ok = await ensureRelogin('401');
+      if (!ok) throw new Error('SESSION_EXPIRED');
+
+      // 重登成功 -> 重试一次（retry=false 防止死循环）
+      return apiFetch(path, { method, headers, body, cache, retry: false });
+    }
+
+    /***********************
+     * 5) ensureRelogin（single-flight）
+     *
+     * - NO_TOKEN 和 401 都走这里
+     * - 多个并发请求同时触发：只会登录一次
+     ***********************/
+    async function ensureRelogin(trigger = '') {
+      if (!reauthPromise) {
+        reauthPromise = (async () => {
+          group(`ensureRelogin(trigger=${trigger})`, () => {
+            log('start', { isRelogging, requireCaptcha, hasToken: !!globalToken, authVersion, sessionVersion });
+          });
+
+          // 如果已经有 token 了（可能被别的并发请求修复了），直接成功
+          if (globalToken) {
+            log('ensureRelogin: already has token -> skip login');
+            return true;
+          }
+
+          const ok = await tryAutoRelogin();
+          log('ensureRelogin: result', { ok, hasToken: !!globalToken, authVersion });
+
+          return ok;
+        })().finally(() => {
+          reauthPromise = null;
+          log('ensureRelogin: end (reauthPromise cleared)');
+        });
+      } else {
+        log('ensureRelogin: reuse existing reauthPromise (single-flight)');
+      }
+      return reauthPromise;
+    }
+
+    /***********************
+     * 6) 验证码：按需加载
+     ***********************/
+    async function initCaptcha(forceShow = false, withSpinner = false) {
+      if (withSpinner) setLoading(true);
+
+      group('initCaptcha()', () => {
+        log('params', { forceShow, withSpinner, requireCaptcha, currentSessionId });
+      });
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/captcha`, { cache: 'no-store' });
+        const json = await res.json();
+        log('captcha response', json);
+
+        if (json.code === 200) {
+          currentSessionId = json.data.sessionId;
+
+          const img = document.getElementById('captchaImg');
+          img.src = 'data:image/png;base64,' + json.data.image;
+          img.classList.remove('hidden');
+          document.getElementById('captchaText').classList.add('hidden');
+
+          if (forceShow) {
+            requireCaptcha = true;
+            document.getElementById('captchaBlock').classList.remove('hidden');
+          } else if (!requireCaptcha) {
+            document.getElementById('captchaBlock').classList.add('hidden');
+          }
+        } else {
+          alert('验证码获取失败: ' + json.msg);
+        }
+      } catch (e) {
+        err('initCaptcha error', e);
+        alert('验证码请求错误');
+      } finally {
+        if (withSpinner) setLoading(false);
+      }
+    }
+
+    async function ensureCaptchaSession(forceShow = false, withSpinner = false) {
+      if (!currentSessionId) {
+        log('ensureCaptchaSession: no sessionId -> initCaptcha');
+        await initCaptcha(forceShow, withSpinner);
+        return;
+      }
+      if (forceShow) {
+        requireCaptcha = true;
+        document.getElementById('captchaBlock').classList.remove('hidden');
+      }
+    }
+
+    /***********************
+     * 7) 登录：按钮点击（交互登录）
+     ***********************/
+    async function handleLogin() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      const c = document.getElementById('captcha').value;
+
+      if (!u || !p) return alert('请填写学号和密码');
+      if (requireCaptcha && !c) return alert('请输入验证码');
+
+      // 如果需要验证码，但当前没有 sessionId，则按需拉取
+      await ensureCaptchaSession(requireCaptcha, true);
+
+      setLoginButtonDisabled(true);
+      setLoading(true);
+
+      try {
+        const ok = await performLoginGuarded(u, p, c, false);
+        if (!ok) return;
+
+        // 登录成功：进入数据区
+        showData();
+        await loadAllData(false);
+      } finally {
+        setLoading(false);
+        setLoginButtonDisabled(false);
+      }
+    }
+
+    // 登录互斥锁：避免并发 performLogin
+    async function performLoginGuarded(username, password, captcha, quiet = false) {
+      if (!loginPromise) {
+        loginPromise = performLogin(username, password, captcha, quiet, 0)
+          .finally(() => (loginPromise = null));
+      } else {
+        log('performLoginGuarded: reuse loginPromise');
+      }
+      return loginPromise;
+    }
+
+    /***********************
+     * 8) performLogin：真正的登录请求
+     *
+     * - quiet=true：用于自动重登/自动登录，不弹窗（除非必须提示）
+     * - retryCount：会话ID无效自愈最多 1 次
+     ***********************/
+    async function performLogin(username, password, captcha, quiet = false, retryCount = 0) {
+      group(`performLogin(quiet=${quiet})`, () => {
+        log('payload draft', {
+          username,
+          hasPwd: !!password,
+          hasCaptcha: !!captcha,
+          requireCaptcha,
+          currentSessionId,
+          retryCount
+        });
+      });
+
+      try {
+        const payload = { sessionId: currentSessionId, username, password };
+        if (requireCaptcha || captcha) payload.code = captcha;
+
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        log('login response', json);
+
+        // ✅ 登录成功
+        if (json.code === 200) {
+          setToken(json.token, quiet ? 'silent relogin / auto login' : 'interactive login');
+          reauthFailedNotified = false;
+          noTokenNotified = false;
+
+          if (!quiet) {
+            await saveCredentialsIfNeeded(username, password);
+          }
+
+          // 登录成功时，隐藏验证码块（让 UI 更干净）
+          // 注意：如果后续又 NEED_CAPTCHA，会再显示
+          requireCaptcha = false;
+          document.getElementById('captchaBlock').classList.add('hidden');
+
+          return true;
+        }
+
+        // ✅ 需要验证码
+        if (json.action === 'NEED_CAPTCHA') {
+          warn('login need captcha', json.msg);
+
+          requireCaptcha = true;
+          document.getElementById('captchaBlock').classList.remove('hidden');
+          document.getElementById('captcha').value = '';
+
+          // 强制刷新验证码图片
+          await initCaptcha(true, false);
+
+          // quiet 模式不弹“登录失败”，但为了用户可操作，需要在后续错误处理引导回登录页
+          if (!quiet) alert(json.msg || '登录失败，需要验证码，请输入验证码后再试');
+          return false;
+        }
+
+        // ✅ 会话ID无效：自愈刷新 captcha session，最多 1 次
+        if (json.code === 400 && json.msg && json.msg.includes('会话ID无效')) {
+          warn('login invalid sessionId -> refresh captcha session', { retryCount });
+
+          if (retryCount >= 1) {
+            if (!quiet) alert('会话多次失效，请刷新验证码后重试');
+            return false;
+          }
+
+          currentSessionId = '';
+          await initCaptcha(false, false);
+          return performLogin(username, password, '', quiet, retryCount + 1);
+        }
+
+        // 其它失败
+        warn('login failed', json.msg);
+        if (!quiet) alert('登录失败: ' + (json.msg || '未知错误'));
+
+        // 如果当前处于验证码模式，顺便刷新验证码，避免用户一直填旧图
+        if (requireCaptcha) await initCaptcha(true, false);
+
+        return false;
+      } catch (e) {
+        err('login error', e);
+        if (!quiet) alert('登录请求错误');
+        return false;
+      }
+    }
+
+    /***********************
+     * 9) tryAutoRelogin：自动重登/自动登录（quiet）
+     *
+     * ✅ 触发条件：
+     *   - apiFetch 发现 NO_TOKEN
+     *   - apiFetch 发现 401
+     *
+     * ✅ 行为：
+     *   - 读取保存的账号密码
+     *   - 按需拉 captcha sessionId（不强制显示验证码块）
+     *   - quiet 登录
+     ***********************/
+    async function tryAutoRelogin() {
+      if (isRelogging) {
+        warn('tryAutoRelogin: already relogging -> skip');
+        return false;
+      }
+
+      const saved = await getSavedCredentials();
+      if (!saved || !saved.username || !saved.password || saved.remember !== true) {
+        warn('tryAutoRelogin: no saved credentials / remember not true', saved);
+        return false;
+      }
+
+      isRelogging = true;
+      group('tryAutoRelogin()', () => {
+        log('saved credentials found', { username: saved.username, remember: saved.remember });
+      });
+
+      try {
+        // 自动重登不需要展示验证码块，但需要 sessionId
+        currentSessionId = '';
+        requireCaptcha = false;
+        await ensureCaptchaSession(false, false);
+
+        const ok = await performLogin(saved.username, saved.password, '', true);
+        log('tryAutoRelogin result', { ok, hasToken: !!globalToken, authVersion });
+
+        return ok;
+      } finally {
+        isRelogging = false;
+      }
+    }
+
+    /***********************
+     * 10) 启动策略：token 探活 -> 并发加载
+     ***********************/
+    async function appStart() {
+      group('appStart()', () => {
+        log('initial', { hasToken: !!globalToken, authVersion, sessionVersion });
+      });
+
+      setLoading(true);
+      try {
+        // 先填充保存账号/密码（不请求验证码）
+        await loadSavedCredentials();
 
         if (globalToken) {
-            loadAllData();
-        } else {
-            (async () => {
-                await loadSavedCredentials();
-                await autoLoginOnLoad();
-            })();
-            initCaptcha();
+          const ok = await bootstrapWithToken();
+          if (ok) return;
         }
 
-        async function initCaptcha(forceShow = false) {
-            setLoading(true);
-            try {
-                const res = await fetch(`${API_BASE}/auth/captcha`, { cache: 'no-store' });
-                const json = await res.json();
-                if (json.code === 200) {
-                    currentSessionId = json.data.sessionId;
-                    const img = document.getElementById('captchaImg');
-                    img.src = 'data:image/png;base64,' + json.data.image;
-                    img.classList.remove('hidden');
-                    document.getElementById('captchaText').classList.add('hidden');
-                    if (forceShow) {
-                        requireCaptcha = true;
-                        document.getElementById('captchaBlock').classList.remove('hidden');
-                    } else if (!requireCaptcha) {
-                        document.getElementById('captchaBlock').classList.add('hidden');
-                    }
-                } else {
-                    alert('验证码获取失败: ' + json.msg);
-                }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
-            }
+        const autoOk = await autoLoginOnLoad();
+        if (autoOk) return;
+
+        showLogin();
+        log('appStart: stay on login');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function bootstrapWithToken() {
+      group('bootstrapWithToken()', () => {});
+      try {
+        // 用 apiFetch 探活：若 401 则自动重登并重试
+        const res = await apiFetch('/api/user', { retry: true });
+        const json = await res.json();
+        log('token probe success -> /api/user', json);
+
+        showData();
+        renderUser(json.data);
+
+        await Promise.all([
+          loadEcard(false, false),
+          loadSchedule(false, false),
+        ]);
+
+        return true;
+      } catch (e) {
+        warn('bootstrapWithToken failed', e);
+
+        // 如果失败时 requireCaptcha=true，说明自动重登需要验证码：保留验证码状态给用户输入
+        if (requireCaptcha) {
+          alert('自动登录需要验证码，请在登录页输入验证码后登录');
+          await handleLogout(true, true);
+          return false;
         }
 
-        async function handleLogin() {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            const c = document.getElementById('captcha').value;
-            if(!u || !p) return alert('请填写学号和密码');
-            if(requireCaptcha && !c) return alert('请输入验证码');
-            await performLogin(u, p, c, false);
+        alert('登录已过期，请重新登录');
+        await handleLogout(true, false);
+        return false;
+      }
+    }
+
+    /***********************
+     * 11) 数据加载（去掉“无 token 直接 return alert”）
+     *
+     * ✅ 关键点：
+     *   - 现在允许 globalToken 为空进入 loadXxx，
+     *     由 apiFetch 负责自动登录/重登。
+     *   - v=sessionVersion 仅在 logout 时变化，因此自动重登不会导致误判 stale。
+     ***********************/
+    async function loadAllData(withSpinner = true) {
+      const v = sessionVersion;
+      log('loadAllData start', { sessionVersion: v, hasToken: !!globalToken, authVersion });
+
+      if (withSpinner) setLoading(true);
+      try {
+        await Promise.all([
+          loadUser(false, false),
+          loadEcard(false, false),
+          loadSchedule(false, false),
+        ]);
+      } finally {
+        if (withSpinner) setLoading(false);
+      }
+    }
+
+    async function loadUser(refresh = false, withSpinner = true) {
+      const v = sessionVersion;
+      if (withSpinner) setLoading(true);
+
+      try {
+        if (!globalToken) warn('loadUser: NO_TOKEN -> apiFetch will try auto login');
+
+        const res = await apiFetch(`/api/user${refresh ? '?refresh=true' : ''}`, { retry: true });
+        const json = await res.json();
+
+        if (v !== sessionVersion) {
+          warn('loadUser: stale response ignored', { v, sessionVersion });
+          return;
         }
 
-        async function performLogin(username, password, captcha, quiet = false) {
-            log('performLogin', { quiet, requireCaptcha });
-            if (!quiet) setLoading(true);
-            try {
-                const payload = { sessionId: currentSessionId, username, password };
-                if (requireCaptcha || captcha) payload.code = captcha;
+        renderUser(json.data);
+        panelLoaded.user = true;
+      } catch (e) {
+        await handleFetchError(e, () => loadUser(refresh, false), '个人信息获取失败');
+      } finally {
+        if (withSpinner) setLoading(false);
+      }
+    }
 
-                const res = await fetch(`${API_BASE}/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const json = await res.json();
-                log('login response', json);
-                if (json.code === 200) {
-                    globalToken = json.token;
-                    localStorage.setItem('huas_token', globalToken);
-                    reauthFailedNotified = false;
-                    if (!quiet) {
-                        await saveCredentialsIfNeeded(username, password);
-                        document.getElementById('loginCard').classList.add('hidden');
-                        document.getElementById('dataArea').classList.remove('hidden');
-                        await loadAllData();
-                    }
-                    return true;
-                }
+    function renderUser(data) {
+      if (!data) return;
+      document.getElementById('uiName').innerText = data.name ?? '--';
+      document.getElementById('uiId').innerText = data.studentId ?? '--';
+      document.getElementById('uiClass').innerText = data.className ?? '--';
 
-                if (json.action === 'NEED_CAPTCHA') {
-                    log('login need captcha', json.msg);
-                    requireCaptcha = true;
-                    document.getElementById('captchaBlock').classList.remove('hidden');
-                    document.getElementById('captcha').value = '';
-                    initCaptcha(true);
-                    if (!quiet) alert(json.msg || '登录失败，可能学号/密码错误，请输入验证码后再试');
-                } else if (json.code === 400 && json.msg && json.msg.includes('会话ID无效')) {
-                    log('login invalid sessionId, refreshing captcha session');
-                    await initCaptcha(false);
-                    if (quiet) {
-                        return performLogin(username, password, '', true);
-                    }
-                    alert('会话已失效，已刷新验证码，请重试');
-                } else {
-                    log('login failed', json.msg);
-                    if (!quiet) alert('登录失败: ' + json.msg);
-                    initCaptcha(requireCaptcha);
-                }
-                return false;
-            } catch (e) {
-                log('login error', e);
-                if (!quiet) alert('登录请求错误');
-                return false;
-            } finally {
-                if (!quiet) setLoading(false);
-            }
+      // 固定头像 🎄
+      const avatar = document.getElementById('userAvatar');
+      if (avatar) avatar.textContent = '🎄';
+    }
+
+    async function loadEcard(refresh = false, withSpinner = true) {
+      const v = sessionVersion;
+      if (withSpinner) setLoading(true);
+
+      try {
+        if (!globalToken) warn('loadEcard: NO_TOKEN -> apiFetch will try auto login');
+
+        const res = await apiFetch(`/api/ecard${refresh ? '?refresh=true' : ''}`, { retry: true });
+        const json = await res.json();
+
+        if (v !== sessionVersion) {
+          warn('loadEcard: stale response ignored', { v, sessionVersion });
+          return;
         }
 
-        async function loadAllData() {
-            if (!globalToken) return;
-            setLoading(true);
-            document.getElementById('loginCard').classList.add('hidden');
-            document.getElementById('dataArea').classList.remove('hidden');
-            await Promise.all([
-                loadUser(false),
-                loadEcard(false),
-                loadSchedule(false)
-            ]);
-            setLoading(false);
+        renderEcard(json.data);
+        panelLoaded.ecard = true;
+      } catch (e) {
+        await handleFetchError(e, () => loadEcard(refresh, false), '一卡通获取失败');
+      } finally {
+        if (withSpinner) setLoading(false);
+      }
+    }
+
+    function renderEcard(data) {
+      if (!data) return;
+
+      let statusText = data.status;
+      if (!statusText || String(statusText).includes('未知')) statusText = '正常';
+
+      const balanceText = (data.balance === undefined || data.balance === null) ? '0.00' : data.balance;
+      const elStatus = document.getElementById('ecStatus');
+
+      elStatus.innerText = statusText;
+      if (statusText === '正常') {
+        elStatus.className = "px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded text-[10px] font-bold text-green-600";
+      } else {
+        elStatus.className = "px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded text-[10px] font-bold text-red-600";
+      }
+      document.getElementById('ecBalance').innerText = balanceText;
+    }
+
+    async function loadSchedule(refresh = false, withSpinner = true) {
+      const v = sessionVersion;
+      if (withSpinner) setLoading(true);
+
+      try {
+        if (!globalToken) warn('loadSchedule: NO_TOKEN -> apiFetch will try auto login');
+
+        const res = await apiFetch(`/api/schedule${refresh ? '?refresh=true' : ''}`, { retry: true });
+        const json = await res.json();
+
+        if (v !== sessionVersion) {
+          warn('loadSchedule: stale response ignored', { v, sessionVersion });
+          return;
         }
 
-        async function loadUser(refresh = false, withSpinner = true) {
-            if (!globalToken) return alert('请先登录');
-            if (withSpinner) setLoading(true);
-            try {
-                const res = await fetch(`${API_BASE}/api/user${refresh ? '?refresh=true' : ''}`, { 
-                    headers: { 'Authorization': globalToken },
-                    cache: 'no-store'
-                });
-                if (res.status === 401) throw new Error('SESSION_EXPIRED');
-                const json = await res.json();
-                renderUser(json.data);
-                panelLoaded.user = true;
-            } catch (e) {
-                await handleFetchError(e, () => loadUser(refresh, false));
-            } finally {
-                if (withSpinner) setLoading(false);
-            }
-        }
+        renderSchedule(json.data);
+        panelLoaded.schedule = true;
+      } catch (e) {
+        await handleFetchError(e, () => loadSchedule(refresh, false), '课表获取失败');
+      } finally {
+        if (withSpinner) setLoading(false);
+      }
+    }
 
-        function renderUser(data) {
-            if(!data) return;
-            document.getElementById('uiName').innerText = data.name;
-            document.getElementById('uiId').innerText = data.studentId;
-            document.getElementById('uiClass').innerText = data.className;
-            const seed = encodeURIComponent(data.name || 'Student');
-            document.getElementById('userAvatar').src = `https://api.dicebear.com/9.x/notionists/svg?seed=${seed}&backgroundColor=e9d5ff`;
-        }
+    // 固定高度 h-[120px] 确保严格对齐
+    function renderSchedule(data) {
+      if (!data) return;
+      document.getElementById('schWeek').innerText = data.week || 'Schedule';
 
-        async function loadEcard(refresh = false, withSpinner = true) {
-            if (!globalToken) return alert('请先登录');
-            if (withSpinner) setLoading(true);
-            try {
-                const res = await fetch(`${API_BASE}/api/ecard${refresh ? '?refresh=true' : ''}`, { 
-                    headers: { 'Authorization': globalToken },
-                    cache: 'no-store'
-                });
-                if (res.status === 401) throw new Error('SESSION_EXPIRED');
-                const json = await res.json();
-                renderEcard(json.data);
-                panelLoaded.ecard = true;
-            } catch (e) {
-                log('loadEcard error', e);
-                await handleFetchError(e, () => loadEcard(refresh, false), '一卡通获取失败');
-            } finally {
-                if (withSpinner) setLoading(false);
-            }
-        }
+      const container = document.getElementById('scheduleContainer');
+      const isMobile = window.innerWidth < 768;
+      const leftColWidth = isMobile ? 50 : 60;
+      const dayMinWidth = isMobile ? 90 : 110;
+      container.style.minWidth = `${leftColWidth + 7 * dayMinWidth}px`;
 
-        function renderEcard(data) {
-            if(!data) return;
-            let statusText = data.status;
-            if (!statusText || statusText.includes('未知')) {
-                statusText = '正常';
-            }
-            const balanceText = (data.balance === undefined || data.balance === null) ? '0.00' : data.balance;
-            const elStatus = document.getElementById('ecStatus');
-            elStatus.innerText = statusText;
-            if (statusText === '正常') {
-                elStatus.className = "px-2 py-0.5 border border-white/20 bg-green-400/20 rounded-full text-[10px] font-bold text-green-200";
-            } else {
-                elStatus.className = "px-2 py-0.5 border border-red-400/40 bg-red-400/10 rounded-full text-[10px] font-bold text-red-200";
-            }
-            document.getElementById('ecBalance').innerText = balanceText;
-        }
+      const courseMap = {};
+      if (data.courses && Array.isArray(data.courses)) {
+        data.courses.forEach(c => {
+          const match = c.section?.match?.(/(\d+)/);
+          if (!match) return;
+          const startNode = parseInt(match[1]);
+          const sectionIdx = Math.floor((startNode - 1) / 2);
+          const dayIdx = (c.day || 1) - 1;
+          const key = `${dayIdx}_${sectionIdx}`;
+          if (!courseMap[key]) courseMap[key] = [];
+          courseMap[key].push(c);
+        });
+      }
 
-        async function loadSchedule(refresh = false, withSpinner = true) {
-            if (!globalToken) return alert('请先登录');
-            if (withSpinner) setLoading(true);
-            try {
-                const res = await fetch(`${API_BASE}/api/schedule${refresh ? '?refresh=true' : ''}`, { 
-                    headers: { 'Authorization': globalToken },
-                    cache: 'no-store'
-                });
-                if (res.status === 401) throw new Error('SESSION_EXPIRED');
-                const json = await res.json();
-                renderSchedule(json.data);
-                panelLoaded.schedule = true;
-            } catch (e) {
-                log('loadSchedule error', e);
-                await handleFetchError(e, () => loadSchedule(refresh, false), '课表获取失败');
-            } finally {
-                if (withSpinner) setLoading(false);
-            }
-        }
+      let html = `<div class="grid" style="grid-template-columns:${leftColWidth}px repeat(7, minmax(${dayMinWidth}px,1fr));">`;
+      html += `<div class="sticky-col sticky-shadow bg-[#FFFFFF] border-b border-r border-gray-100 z-40" style="width:${leftColWidth}px"></div>`;
 
-        function renderSchedule(data) {
-            if(!data) return;
-            document.getElementById('schWeek').innerText = data.week || 'Schedule';
-            const container = document.getElementById('scheduleContainer');
-            const isMobile = window.innerWidth < 768;
-            const leftColWidth = isMobile ? 50 : 60;
-            const dayMinWidth = isMobile ? 90 : 110;
-            container.style.minWidth = `${leftColWidth + 7 * dayMinWidth}px`;
-            const courseMap = {};
-            if (data.courses && Array.isArray(data.courses)) {
-                data.courses.forEach(c => {
-                    const match = c.section.match(/(\d+)/);
-                    if (!match) return;
-                    const startNode = parseInt(match[1]);
-                    const sectionIdx = Math.floor((startNode - 1) / 2);
-                    const dayIdx = c.day - 1;
-                    const key = `${dayIdx}_${sectionIdx}`;
-                    if (!courseMap[key]) courseMap[key] = [];
-                    courseMap[key].push(c);
-                });
-            }
-            let html = `<div class="grid" style="grid-template-columns:${leftColWidth}px repeat(7, minmax(${dayMinWidth}px,1fr));">`;
-            html += `<div class="sticky-col sticky-shadow bg-[#F8FAFC] border-b border-r border-slate-100 z-40" style="width:${leftColWidth}px"></div>`;
-            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            const todayColIdx = (new Date().getDay() + 6) % 7;
-            days.forEach((d, i) => {
-                const isToday = i === todayColIdx;
-                const bgClass = isToday ? 'text-popTeal bg-popTeal/10' : 'text-slate-400';
-                const marker = isToday ? 'today-col' : '';
-                html += `<div class="text-center font-black text-[10px] py-3 border-b border-slate-100 ${bgClass} ${marker}" data-day="${i}">${d}</div>`;
-            });
-            const sections = ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12'];
-            for (let s = 0; s < 6; s++) {
-                html += `
-                    <div class="sticky-col sticky-shadow flex items-center justify-center font-bold text-slate-400 bg-[#F8FAFC] border-r border-b border-slate-100 text-[10px] z-30" style="width:${leftColWidth}px">
-                        ${sections[s]}
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const todayColIdx = (new Date().getDay() + 6) % 7;
+
+      days.forEach((d, i) => {
+        const isToday = i === todayColIdx;
+        const bgClass = isToday ? 'text-iosBlue bg-iosBlue/5 font-bold' : 'text-sub font-semibold';
+        html += `<div class="text-center text-[11px] py-3 border-b border-gray-100 ${bgClass}" data-day="${i}">${d}</div>`;
+      });
+
+      const sections = ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12'];
+      for (let s = 0; s < 6; s++) {
+        html += `
+          <div class="sticky-col sticky-shadow flex items-center justify-center font-semibold text-sub bg-[#FFFFFF] border-r border-b border-gray-100 text-[10px] z-30" style="width:${leftColWidth}px">
+            ${sections[s]}
+          </div>
+        `;
+
+        for (let d = 0; d < 7; d++) {
+          const courses = courseMap[`${d}_${s}`];
+          const colBg = d === todayColIdx ? 'bg-iosBlue/5' : '';
+          html += `<div class="p-1 border-b border-gray-100 border-r border-gray-100 ${colBg} h-[120px] relative" data-day="${d}">`;
+
+          if (courses && courses.length > 0) {
+            html += `<div class="flex flex-col gap-1 h-full">`;
+            courses.forEach((course, idx) => {
+              const colorIdx = (d + s + idx) % COURSE_COLORS.length;
+              const bgClass = COURSE_COLORS[colorIdx];
+              html += `
+                <div class="course-card flex-1 ${bgClass} border border-transparent rounded-lg p-2 shadow-sm cursor-pointer flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all duration-200" title="${course.name || ''}">
+                  <div class="font-bold text-[11px] text-ink leading-tight line-clamp-3 z-10 relative mb-1">
+                    ${course.name || '--'}
+                  </div>
+                  ${course.location ? `
+                    <div class="flex justify-start z-10 relative">
+                      <div class="inline-flex items-start bg-white/60 px-1.5 py-0.5 rounded text-[9px] font-semibold text-ink/80 backdrop-blur-sm max-w-full leading-tight flex-col">
+                        <span class="break-words">${String(course.location).replace('校本部', '').replace(/(楼)[A-Za-z]?\d+.*/, '$1')}</span>
+                        <span class="text-[10px] font-bold">${(String(course.location).match(/(楼)([A-Za-z]?\d+)/) || [,'',''])[2]}</span>
+                      </div>
                     </div>
-                `;
-                for (let d = 0; d < 7; d++) {
-                    const courses = courseMap[`${d}_${s}`];
-                    const colBg = d === todayColIdx ? 'bg-popTeal/5' : '';
-                    html += `<div class="p-1 border-b border-slate-100 border-r border-dashed border-slate-200 ${colBg} min-h-[90px] relative" data-day="${d}">`;
-                    if (courses && courses.length > 0) {
-                        html += `<div class="flex flex-col gap-1 h-full">`; 
-                        courses.forEach((course, idx) => {
-                             const colorIdx = (d + s + idx) % COURSE_COLORS.length;
-                             const bgClass = COURSE_COLORS[colorIdx];
-                             html += `
-                                <div class="course-card flex-1 ${bgClass} border-2 border-ink rounded-lg p-1.5 shadow-card cursor-pointer flex flex-col justify-between relative overflow-hidden group hover:translate-y-[-2px] hover:shadow-hard transition-all duration-200" title="${course.name}">
-                                    <div class="font-black text-[10px] text-ink leading-tight line-clamp-3 z-10 relative mb-1">
-                                        ${course.name}
-                                    </div>
-                                    ${course.location ? `
-                                    <div class="flex justify-start z-10 relative">
-                                        <div class="inline-flex items-start bg-white/70 border border-ink/10 px-1.5 py-1 rounded-lg text-[8px] font-bold text-ink/80 backdrop-blur-sm max-w-full leading-tight flex-col">
-                                            <span class="break-words">${course.location.replace('校本部', '').replace(/(楼)[A-Za-z]?\d+.*/, '$1')}</span>
-                                            <span class="text-[9px] font-black">${(course.location.match(/(楼)([A-Za-z]?\d+)/) || [,'',''])[2]}</span>
-                                        </div>
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        });
-                        html += `</div>`;
-                    }
-                    html += `</div>`;
-                }
-            }
+                  ` : ''}
+                </div>
+              `;
+            });
             html += `</div>`;
-            container.innerHTML = html;
+          }
+
+          html += `</div>`;
+        }
+      }
+
+      html += `</div>`;
+      container.innerHTML = html;
+    }
+
+    async function loadGrades(refresh = false) {
+      const v = sessionVersion;
+      setLoading(true);
+
+      try {
+        if (!globalToken) warn('loadGrades: NO_TOKEN -> apiFetch will try auto login');
+
+        const res = await apiFetch(`/api/grades${refresh ? '?refresh=true' : ''}`, { retry: true });
+        const json = await res.json();
+
+        if (v !== sessionVersion) {
+          warn('loadGrades: stale response ignored', { v, sessionVersion });
+          return;
         }
 
-        async function loadGrades(refresh = false) {
-            if (!globalToken) return alert('请先登录');
-            setLoading(true);
-            try {
-                const res = await fetch(`${API_BASE}/api/grades${refresh ? '?refresh=true' : ''}`, {
-                    headers: { 'Authorization': globalToken },
-                    cache: 'no-store'
-                });
-                if (res.status === 401) throw new Error('SESSION_EXPIRED');
-                const json = await res.json();
-                if (json.code && json.code !== 200) {
-                    throw new Error(json.msg || '成绩获取失败');
-                }
-                renderGrades(json.data);
-                panelLoaded.grades = true;
-            } catch (e) {
-                if (e.message === 'SESSION_EXPIRED') {
-                    alert('登录已过期，请重新登录');
-                    handleLogout();
-                } else {
-                    alert(e.message || '成绩获取失败');
-                    console.error(e);
-                }
-            } finally {
-                setLoading(false);
-            }
+        if (json.code && json.code !== 200) throw new Error(json.msg || '成绩获取失败');
+        renderGrades(json.data);
+        panelLoaded.grades = true;
+      } catch (e) {
+        await handleFetchError(e, () => loadGrades(refresh), '成绩获取失败');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderGrades(data) {
+      if (!data) return;
+
+      const summary = data.summary || {};
+      document.getElementById('gCredits').innerText = summary.totalCredits ?? '--';
+      document.getElementById('gGpa').innerText = summary.averageGpa ?? '--';
+
+      const sourceEl = document.getElementById('gradeSource');
+      if (data._source) {
+        sourceEl.innerText = String(data._source).toUpperCase();
+        sourceEl.classList.remove('hidden');
+      } else {
+        sourceEl.innerText = '';
+        sourceEl.classList.add('hidden');
+      }
+
+      const list = document.getElementById('gradeList');
+      list.innerHTML = '';
+
+      const items = data.items || [];
+      if (!items.length) {
+        list.innerHTML = `
+          <div class="flex flex-col items-center justify-center py-8 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+            <div class="text-3xl grayscale opacity-30 mb-2">💯</div>
+            <div class="text-xs font-bold text-sub">暂无成绩数据</div>
+            <div class="text-[10px] text-gray-400 mt-1">请尝试刷新或评教后再试</div>
+          </div>`;
+        return;
+      }
+
+      const groupMap = {};
+      items.forEach(item => {
+        const term = item.term || '未知学期';
+        if (!groupMap[term]) groupMap[term] = [];
+        groupMap[term].push(item);
+      });
+
+      const parseTerm = (term) => {
+        const m = String(term).match(/(\d{4}).*?(\d{4}).*?(\d+)/);
+        if (m) return { y1: parseInt(m[1]), y2: parseInt(m[2]), sem: parseInt(m[3]) };
+        return null;
+      };
+
+      const sortedTerms = Object.keys(groupMap).sort((a, b) => {
+        const pa = parseTerm(a); const pb = parseTerm(b);
+        if (pa && pb) {
+          if (pa.y1 !== pb.y1) return pb.y1 - pa.y1;
+          if (pa.y2 !== pb.y2) return pb.y2 - pa.y2;
+          return (pb.sem || 0) - (pa.sem || 0);
+        }
+        return String(b).localeCompare(String(a));
+      });
+
+      sortedTerms.forEach(term => {
+        list.innerHTML += `
+          <div class="px-2 py-1 text-[11px] font-semibold text-sub uppercase tracking-wider mt-4">
+            ${term}
+          </div>
+          <div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+        `;
+
+        const termItems = groupMap[term];
+        termItems.forEach((item, index) => {
+          const passTag = item.pass === null ? '' : item.pass ? 'text-iosGreen' : 'text-iosRed';
+          const scoreText = item.score !== null ? item.score : item.scoreText || '--';
+          const natureText = item.courseCategory || item.courseAttribute || '';
+          const natureRow = natureText ? `
+            <div class="flex items-center justify-between text-[11px] text-sub mt-1">
+              <span class="bg-gray-100 px-1 rounded">${natureText}</span>
+            </div>` : '';
+          const borderClass = index === termItems.length - 1 ? '' : 'border-b border-gray-100';
+
+          list.innerHTML += `
+            <div class="p-3.5 ${borderClass} hover:bg-gray-50 transition-colors">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="text-[15px] font-bold text-ink leading-tight mt-0.5 line-clamp-2">${item.courseName || '--'}</div>
+                  <div class="text-[12px] text-sub font-mono mt-0.5">${item.courseCode || '--'}</div>
+                </div>
+                <div class="flex flex-col items-end text-right">
+                  <div class="text-[17px] font-bold ${passTag}">${scoreText}</div>
+                  <div class="text-[11px] text-sub mt-0.5">学分 ${item.credit ?? '--'} · 绩点 ${item.gpa ?? '--'}</div>
+                </div>
+              </div>
+              ${natureRow}
+            </div>
+          `;
+        });
+
+        list.innerHTML += `</div>`;
+      });
+    }
+
+    /***********************
+     * 12) Panel & 刷新
+     ***********************/
+    function togglePanel(name, forceOpen = null) {
+      const container = document.getElementById(`panelContent-${name}`);
+      const wrapper = document.querySelector(`[data-panel="${name}"]`);
+      const arrow = document.getElementById('gradeArrow');
+
+      const isOpen = !container.classList.contains('hidden');
+      const next = forceOpen !== null ? forceOpen : !isOpen;
+
+      container.classList.toggle('hidden', !next);
+      wrapper?.setAttribute('data-open', next ? 'true' : 'false');
+      if (arrow) arrow.style.transform = next ? 'rotate(180deg)' : 'rotate(0deg)';
+
+      if (next && name === 'grades' && !panelLoaded.grades) loadGrades(false);
+    }
+
+    function refreshGradesButton() {
+      const container = document.getElementById('panelContent-grades');
+      if (container.classList.contains('hidden')) togglePanel('grades', true);
+      loadGrades(true);
+    }
+
+    /***********************
+     * 13) 统一错误处理（全覆盖）
+     *
+     * apiFetch 可能抛：
+     *  - NO_TOKEN：无 token 且自动登录失败
+     *  - SESSION_EXPIRED：401 且自动重登失败
+     *  - 其他：网络/解析/业务异常
+     ***********************/
+    async function handleFetchError(error, retryFn, fallbackMsg = '请求失败') {
+      const msg = error?.message || String(error);
+      warn('handleFetchError', { msg, error, requireCaptcha, hasToken: !!globalToken, authVersion, sessionVersion });
+
+      // ✅ 自动重登需要验证码：引导用户回登录页输入验证码（并保留验证码状态）
+      if (requireCaptcha) {
+        alert('自动登录需要验证码，请在登录页输入验证码后登录');
+        await handleLogout(true, true);
+        return;
+      }
+
+      if (msg === 'NO_TOKEN') {
+        // 避免刷屏弹窗
+        if (!noTokenNotified) {
+          alert('请先登录');
+          noTokenNotified = true;
+        }
+        await handleLogout(true, false);
+        return;
+      }
+
+      if (msg === 'SESSION_EXPIRED') {
+        if (!reauthFailedNotified) {
+          alert('登录已过期，请重新登录');
+          reauthFailedNotified = true;
+        }
+        await handleLogout(true, false);
+        return;
+      }
+
+      alert(fallbackMsg);
+    }
+
+    /***********************
+     * 14) 登出（保持健壮性）
+     *
+     * preserveCreds:
+     *   - true：保留保存的账号密码（默认）
+     *   - false：清空 localStorage + indexedDB 保存的凭据
+     *
+     * keepCaptchaState:
+     *   - true：保留 requireCaptcha/currentSessionId，不隐藏验证码块
+     *           用于“自动重登需要验证码”的引导场景
+     *   - false：清理验证码状态（默认）
+     ***********************/
+    async function handleLogout(preserveCreds = true, keepCaptchaState = false) {
+      group('handleLogout()', () => {
+        log('logout params', { preserveCreds, keepCaptchaState, hasToken: !!globalToken, authVersion, sessionVersion });
+      });
+
+      bumpSessionVersion('logout');
+      setToken('', 'logout');
+
+      panelLoaded.schedule = panelLoaded.grades = panelLoaded.ecard = panelLoaded.user = false;
+
+      // 默认清理验证码状态
+      if (!keepCaptchaState) {
+        requireCaptcha = false;
+        currentSessionId = '';
+        document.getElementById('captcha').value = '';
+        document.getElementById('captchaBlock').classList.add('hidden');
+      } else {
+        // 保留验证码状态（并确保验证码块可见）
+        document.getElementById('captchaBlock').classList.remove('hidden');
+      }
+
+      showLogin();
+
+      if (!preserveCreds) {
+        clearCredentialsLocal();
+        await clearCredentialsIndexedDB();
+      }
+
+      // 回到登录页：填充保存的账号密码（不自动请求验证码）
+      await loadSavedCredentials();
+    }
+
+    /***********************
+     * 15) 保存凭据（保持原逻辑）
+     ***********************/
+    async function loadSavedCredentials() {
+      try {
+        const saved = await getSavedCredentials();
+        if (!saved) {
+          log('no saved credentials found -> default rememberMe checked');
+          document.getElementById('rememberMe').checked = true;
+          return;
         }
 
-        function renderGrades(data) {
-            if (!data) return;
-            const summary = data.summary || {};
-            document.getElementById('gCredits').innerText = summary.totalCredits ?? '--';
-            document.getElementById('gGpa').innerText = summary.averageGpa ?? '--';
-            const sourceEl = document.getElementById('gradeSource');
-            if (data._source) {
-                sourceEl.innerText = data._source.toUpperCase();
-                sourceEl.classList.remove('hidden');
-            } else {
-                sourceEl.innerText = '';
-                sourceEl.classList.add('hidden');
-            }
-            const list = document.getElementById('gradeList');
-            list.innerHTML = '';
-            
-            const items = data.items || [];
-            
-            // 优化空状态显示 (Dashed Box Empty State)
-            if (!items.length) {
-                list.innerHTML = `
-                    <div class="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                        <div class="text-3xl grayscale opacity-50 mb-2">💯</div>
-                        <div class="text-xs font-bold text-slate-400">暂无成绩数据</div>
-                        <div class="text-[10px] text-slate-300 mt-1">请尝试刷新或评教后再试</div>
-                    </div>`;
-                return;
-            }
+        const { username, password, remember } = saved;
+        if (username) document.getElementById('username').value = username;
+        if (password) document.getElementById('password').value = password;
+        if (remember !== undefined) document.getElementById('rememberMe').checked = remember;
+      } catch (e) {
+        err('loadSavedCredentials error', e);
+      }
+    }
 
-            const groupMap = {};
-            items.forEach(item => {
-                const term = item.term || '未知学期';
-                if (!groupMap[term]) groupMap[term] = [];
-                groupMap[term].push(item);
-            });
-            const parseTerm = (term) => {
-                const m = term.match(/(\d{4}).*?(\d{4}).*?(\d+)/);
-                if (m) return { y1: parseInt(m[1]), y2: parseInt(m[2]), sem: parseInt(m[3]) };
-                return null;
-            };
-            const sortedTerms = Object.keys(groupMap).sort((a, b) => {
-                const pa = parseTerm(a); const pb = parseTerm(b);
-                if (pa && pb) {
-                    if (pa.y1 !== pb.y1) return pb.y1 - pa.y1;
-                    if (pa.y2 !== pb.y2) return pb.y2 - pa.y2;
-                    return (pb.sem || 0) - (pa.sem || 0);
-                }
-                return b.localeCompare(a);
-            });
-            sortedTerms.forEach(term => {
-                list.innerHTML += `
-                    <div class="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] font-black text-slate-600 tracking-wide mt-2">
-                        ${term}
-                    </div>
-                `;
-                groupMap[term].forEach(item => {
-                    const passTag = item.pass === null ? '' : item.pass ? 'text-popTeal' : 'text-red-500';
-                    const scoreText = item.score !== null ? item.score : item.scoreText || '--';
-                    const natureText = item.courseCategory || item.courseAttribute || '';
-                    const natureRow = natureText ? `<div class="flex items-center justify-between text-[11px] text-slate-500 mt-2">
-                                <span>性质：${natureText}</span>
-                            </div>` : '';
-                    list.innerHTML += `
-                        <div class="p-3 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-card transition-shadow">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="flex-1 min-w-0">
-                                    <div class="text-base font-black text-ink leading-tight mt-1 line-clamp-2">${item.courseName}</div>
-                                    <div class="text-[11px] text-slate-400 font-mono mt-0.5">${item.courseCode || '--'}</div>
-                                </div>
-                                <div class="flex flex-col items-end text-right">
-                                    <div class="text-xl font-black ${passTag}">${scoreText}</div>
-                                    <div class="text-[11px] text-slate-500 mt-1">学分 ${item.credit ?? '--'} · 绩点 ${item.gpa ?? '--'}</div>
-                                    <div class="text-[10px] text-slate-400">${item.courseNature || '--'}</div>
-                                </div>
-                            </div>
-                            ${natureRow}
-                        </div>
-                    `;
-                });
-            });
+    async function autoLoginOnLoad() {
+      if (autoLoginAttempted) return false;
+      autoLoginAttempted = true;
+
+      const saved = await getSavedCredentials();
+      if (!saved || !saved.username || !saved.password || saved.remember !== true) {
+        log('autoLoginOnLoad skipped', { hasSaved: !!saved, remember: saved?.remember });
+        return false;
+      }
+
+      log('autoLoginOnLoad start...');
+      setLoading(true);
+      try {
+        // 复用 ensureRelogin：它会检查 token，没有就 tryAutoRelogin
+        const ok = await ensureRelogin('AUTO_ON_LOAD');
+        if (!ok) {
+          log('autoLoginOnLoad failed');
+          return false;
         }
 
-        async function handleLogout(preserveCreds = true) {
-            localStorage.removeItem('huas_token');
-            globalToken = '';
-            panelLoaded.schedule = panelLoaded.grades = panelLoaded.ecard = panelLoaded.user = false;
-            requireCaptcha = false;
-            document.getElementById('captcha').value = '';
-            document.getElementById('captchaBlock').classList.add('hidden');
-            document.getElementById('dataArea').classList.add('hidden');
-            document.getElementById('loginCard').classList.remove('hidden');
-            if (!preserveCreds) {
-                clearCredentialsLocal();
-                await clearCredentialsIndexedDB();
-            }
-            loadSavedCredentials();
-            initCaptcha(false);
-        }
+        showData();
+        await loadAllData(false);
+        log('autoLoginOnLoad success');
+        return true;
+      } finally {
+        setLoading(false);
+      }
+    }
 
-        function setLoading(isLoading) {
-            const el = document.getElementById('loading');
-            el.classList.toggle('hidden', !isLoading);
-        }
+    async function saveCredentialsIfNeeded(username, password) {
+      const remember = document.getElementById('rememberMe').checked;
+      if (remember) {
+        const payload = { username, password, remember: true };
+        saveCredentialsLocal(payload);
+        await saveCredentialsIndexedDB(payload);
+      } else {
+        clearCredentialsLocal();
+        await clearCredentialsIndexedDB();
+      }
+    }
 
-        async function loadSavedCredentials() {
-            try {
-                const saved = await getSavedCredentials();
-                if (!saved) {
-                    log('no saved credentials found');
-                    document.getElementById('rememberMe').checked = true;
-                    return;
-                }
-                const { username, password, remember } = saved;
-                if (username) document.getElementById('username').value = username;
-                if (password) document.getElementById('password').value = password;
-                if (remember !== undefined) document.getElementById('rememberMe').checked = remember;
-            } catch (e) { console.error(e); }
-        }
+    function readCredentialsLocal() {
+      for (const key of SAVED_CRED_KEYS) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.username || parsed.password)) return parsed;
+        } catch (e) {}
+      }
+      return null;
+    }
 
-        async function autoLoginOnLoad() {
-            if (autoLoginAttempted || globalToken) return;
-            const saved = await getSavedCredentials();
-            if (!saved || !saved.username || !saved.password || saved.remember !== true) return;
-            autoLoginAttempted = true;
-            setLoading(true);
-            const ok = await tryAutoRelogin();
-            if (ok) {
-                document.getElementById('loginCard').classList.add('hidden');
-                document.getElementById('dataArea').classList.remove('hidden');
-                await loadAllData();
-            }
-            setLoading(false);
-        }
+    function saveCredentialsLocal(payload) {
+      try {
+        const data = JSON.stringify(payload);
+        SAVED_CRED_KEYS.forEach(k => localStorage.setItem(k, data));
+      } catch (e) {}
+    }
 
-        async function saveCredentialsIfNeeded(username, password) {
-            const remember = document.getElementById('rememberMe').checked;
-            if (remember) {
-                const payload = { username, password, remember: true };
-                saveCredentialsLocal(payload);
-                await saveCredentialsIndexedDB(payload);
-            } else {
-                clearCredentialsLocal();
-                await clearCredentialsIndexedDB();
-            }
-        }
+    function clearCredentialsLocal() {
+      SAVED_CRED_KEYS.forEach(k => localStorage.removeItem(k));
+    }
 
-        function togglePanel(name, forceOpen = null) {
-            const container = document.getElementById(`panelContent-${name}`);
-            const wrapper = document.querySelector(`[data-panel="${name}"]`);
-            const arrow = document.getElementById('gradeArrow');
-            
-            const isOpen = !container.classList.contains('hidden');
-            const next = forceOpen !== null ? forceOpen : !isOpen;
-            container.classList.toggle('hidden', !next);
-            wrapper?.setAttribute('data-open', next ? 'true' : 'false');
-            if(arrow) arrow.style.transform = next ? 'rotate(180deg)' : 'rotate(0deg)';
-            if (next && name === 'grades' && !panelLoaded.grades) loadGrades();
-        }
+    function openCredDB() {
+      return new Promise((resolve) => {
+        if (!('indexedDB' in window)) return resolve(null);
+        const req = indexedDB.open(IDB_CONFIG.name, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(IDB_CONFIG.store)) db.createObjectStore(IDB_CONFIG.store);
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      });
+    }
 
-        function refreshGradesButton() {
-            const container = document.getElementById('panelContent-grades');
-            if (container.classList.contains('hidden')) togglePanel('grades', true);
-            loadGrades(true);
-        }
+    async function saveCredentialsIndexedDB(payload) {
+      const db = await openCredDB();
+      if (!db) return false;
+      return new Promise((resolve) => {
+        const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
+        tx.objectStore(IDB_CONFIG.store).put(payload, IDB_CONFIG.key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    }
 
-        function readCredentialsLocal() {
-            for (const key of SAVED_CRED_KEYS) {
-                const raw = localStorage.getItem(key);
-                if (!raw) continue;
-                try {
-                    const parsed = JSON.parse(raw);
-                    if (parsed && (parsed.username || parsed.password)) return parsed;
-                } catch (e) {}
-            }
-            return null;
-        }
+    async function loadCredentialsIndexedDB() {
+      const db = await openCredDB();
+      if (!db) return null;
+      return new Promise((resolve) => {
+        const tx = db.transaction(IDB_CONFIG.store, 'readonly');
+        const req = tx.objectStore(IDB_CONFIG.store).get(IDB_CONFIG.key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      });
+    }
 
-        function saveCredentialsLocal(payload) {
-            try {
-                const data = JSON.stringify(payload);
-                SAVED_CRED_KEYS.forEach(k => localStorage.setItem(k, data));
-            } catch (e) {}
-        }
+    async function clearCredentialsIndexedDB() {
+      const db = await openCredDB();
+      if (!db) return false;
+      return new Promise((resolve) => {
+        const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
+        tx.objectStore(IDB_CONFIG.store).delete(IDB_CONFIG.key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    }
 
-        function clearCredentialsLocal() { SAVED_CRED_KEYS.forEach(k => localStorage.removeItem(k)); }
+    async function getSavedCredentials() {
+      try {
+        const local = readCredentialsLocal();
+        if (local) return local;
+        const idb = await loadCredentialsIndexedDB();
+        return idb || null;
+      } catch {
+        return null;
+      }
+    }
 
-        function openCredDB() {
-            return new Promise((resolve) => {
-                if (!('indexedDB' in window)) return resolve(null);
-                const req = indexedDB.open(IDB_CONFIG.name, 1);
-                req.onupgradeneeded = () => {
-                    const db = req.result;
-                    if (!db.objectStoreNames.contains(IDB_CONFIG.store)) db.createObjectStore(IDB_CONFIG.store);
-                };
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => resolve(null);
-            });
-        }
-
-        async function saveCredentialsIndexedDB(payload) {
-            const db = await openCredDB();
-            if (!db) return false;
-            return new Promise((resolve) => {
-                const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
-                tx.objectStore(IDB_CONFIG.store).put(payload, IDB_CONFIG.key);
-                tx.oncomplete = () => resolve(true);
-                tx.onerror = () => resolve(false);
-            });
-        }
-
-        async function loadCredentialsIndexedDB() {
-            const db = await openCredDB();
-            if (!db) return null;
-            return new Promise((resolve) => {
-                const tx = db.transaction(IDB_CONFIG.store, 'readonly');
-                const req = tx.objectStore(IDB_CONFIG.store).get(IDB_CONFIG.key);
-                req.onsuccess = () => resolve(req.result || null);
-                req.onerror = () => resolve(null);
-            });
-        }
-
-        async function clearCredentialsIndexedDB() {
-            const db = await openCredDB();
-            if (!db) return false;
-            return new Promise((resolve) => {
-                const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
-                tx.objectStore(IDB_CONFIG.store).delete(IDB_CONFIG.key);
-                tx.oncomplete = () => resolve(true);
-                tx.onerror = () => resolve(false);
-            });
-        }
-
-        async function handleFetchError(error, retryFn, fallbackMsg = '请求失败') {
-            if (error.message === 'SESSION_EXPIRED') {
-                if (!reauthPromise) reauthPromise = tryAutoRelogin();
-                const reloginOk = await reauthPromise.catch(() => false);
-                reauthPromise = null;
-                if (reloginOk && typeof retryFn === 'function') return retryFn();
-                if (!reauthFailedNotified) {
-                    alert('登录已过期，请重新登录');
-                    reauthFailedNotified = true;
-                }
-                handleLogout(true);
-            } else {
-                alert(fallbackMsg);
-            }
-        }
-
-        async function getSavedCredentials() {
-            try {
-                const local = readCredentialsLocal();
-                if (local) return local;
-                const idb = await loadCredentialsIndexedDB();
-                return idb || null;
-            } catch { return null; }
-        }
-
-        async function tryAutoRelogin() {
-            if (isRelogging) return false;
-            const saved = await getSavedCredentials();
-            if (!saved || !saved.username || !saved.password) return false;
-            isRelogging = true;
-            currentSessionId = '';
-            requireCaptcha = false;
-            await initCaptcha(false);
-            const ok = await performLogin(saved.username, saved.password, '', true);
-            isRelogging = false;
-            return ok;
-        }
-    </script>
+    /***********************
+     * 16) 入口：不再 initCaptcha（按需）
+     ***********************/
+    appStart();
+  </script>
 </body>
 </html>
