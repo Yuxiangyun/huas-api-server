@@ -2,9 +2,13 @@
 
 ## 基础信息
 
-- **Base URL**: 
-  - 开发环境：`http://localhost:3000`
-  - 生产环境：`http://localhost:12103`（或实际域名）
+- **Base URL**:
+  - 服务端口：`http://localhost:3000`（默认，受 `PORT` 影响）
+  - systemd 生产默认：`http://localhost:12103`（见 `deploy/huas-api.service`）
+- **监控端口**（`MONITOR_PORT`，默认 13001）:
+  - `http://localhost:13001/status.json`
+  - `http://localhost:13001/metrics.json`
+  - `http://localhost:13001/dashboard`
 - **协议**: HTTP/HTTPS
 - **数据格式**: JSON
 
@@ -23,7 +27,8 @@
 ```json
 {
   "code": 401,  // 或其他错误码
-  "msg": "错误信息描述"
+  "msg": "错误信息描述",
+  "action": "RELOGIN"  // 可选：客户端建议动作
 }
 ```
 
@@ -55,19 +60,19 @@
   "code": 200,
   "data": {
     "sessionId": "550e8400-e29b-41d4-a716-446655440000",
-    "image": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+    "image": "/9j/4AAQSkZJRg..."
   }
 }
 ```
 
 **字段说明**:
 - `sessionId`: 临时会话 Token（UUID v4 格式）
-- `image`: Base64 编码的验证码图片（可直接用于 `<img>` 标签）
+- `image`: Base64 编码的验证码图片（原始字符串，必要时自行拼接 `data:image/jpeg;base64,`）
 
 **注意事项**:
 - 验证码有效期为 10 分钟
 - 超过有效期的 sessionId 将被自动清理
-- 速率限制：20 次/分钟
+- 速率限制：20 次/分钟（按客户端 IP）
 
 ---
 
@@ -115,10 +120,19 @@ Content-Type: application/json
 }
 ```
 
+**需要验证码响应**:
+```json
+{
+  "code": 401,
+  "msg": "登录失败：学号或密码可能错误，请输入验证码后再试",
+  "action": "NEED_CAPTCHA"
+}
+```
+
 **注意事项**:
-- 登录成功后 `token` 即为认证凭证，请妥善保存
-- Token 无固定过期时间，90 天未活跃自动失效
-- 速率限制：10 次/分钟
+- 登录成功后 `token` 即为认证凭证（与 `sessionId` 相同）
+- 会话在 30 天未活跃时清理（由定时任务按 `updated_at` 判定）
+- 速率限制：10 次/分钟（按客户端 IP）
 
 ---
 
@@ -165,7 +179,7 @@ Authorization: <token>
 **查询参数**:
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| refresh | boolean | 否 | 是否强制刷新缓存 |
+| refresh | boolean | 否 | 是否强制刷新缓存（当前禁用缓存，保留参数） |
 
 **请求示例**:
 ```
@@ -189,7 +203,7 @@ GET /api/schedule?refresh=true
         "weekStr": "1-16周"
       }
     ],
-    "_source": "cache"
+    "_source": "network"
   }
 }
 ```
@@ -203,16 +217,15 @@ GET /api/schedule?refresh=true
   - `day`: 星期几（1=周一，7=周日）
   - `section`: 节次（如 "1-2" 表示第1-2节）
   - `weekStr`: 上课周次
-- `_source`: 数据来源（`cache` 或 `network`）
+- `_source`: 数据来源（当前固定为 `network`）
 
 **缓存策略**:
-- 课表数据以"本周一 00:00"为界
-- 缓存时间早于本周一则自动刷新
-- 支持通过 `?refresh=true` 强制刷新
+- 当前禁用课表缓存，所有请求均从上游实时获取
+- `refresh` 参数暂仅保留，后续可用于恢复缓存策略
 
 **注意事项**:
-- 强制刷新时如果学校 Session 已失效，将返回 401
-- 速率限制：60 次/分钟
+- 学校 Session 失效时返回 401，并提示重新登录
+- 速率限制：60 次/分钟（按客户端 IP）
 
 ---
 
@@ -247,7 +260,7 @@ GET /api/schedule?refresh=true
 - 无缓存，每次请求均实时获取
 
 **注意事项**:
-- 速率限制：60 次/分钟
+- 速率限制：60 次/分钟（按客户端 IP）
 
 ---
 
@@ -290,7 +303,7 @@ GET /api/schedule?refresh=true
 - 学籍信息变动较少，长期缓存
 
 **注意事项**:
-- 速率限制：60 次/分钟
+- 速率限制：60 次/分钟（按客户端 IP）
 
 ---
 
@@ -303,7 +316,7 @@ GET /api/schedule?refresh=true
 **查询参数**:
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| refresh | boolean | 否 | 是否强制刷新缓存 |
+| refresh | boolean | 否 | 是否强制刷新缓存（当前禁用缓存，保留参数） |
 
 **请求示例**:
 ```
@@ -361,17 +374,36 @@ GET /api/grades?refresh=true
 **实现细节**:
 - 复现抓包请求：POST `https://xyjw.huas.edu.cn/jsxsd/kscj/cjcx_list`，`Content-Type: application/x-www-form-urlencoded`，`Referer: https://xyjw.huas.edu.cn/jsxsd/kscj/cjcx_query`，默认表单 `kksj=&kcxz=&kcmc=&xsfs=max`。
 - 解析 HTML 表格，去除链接/颜色标记，自动提取分数、绩点、学分等数值。
-- 缓存策略：12 小时，可通过 `refresh=true` 强制刷新。
+- 缓存策略：当前禁用成绩缓存，所有请求均从上游实时获取。
 
 ---
 
 ## 3. 系统模块 (System)
 
-### 3.1 健康检查
+### 3.1 健康检查（根路径）
+
+**接口**: `GET /health`
+
+**描述**: 负载均衡/探针用健康检查
+
+**请求参数**: 无
+
+**响应示例**:
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "uptime": 86400.5
+}
+```
+
+---
+
+### 3.2 健康检查
 
 **接口**: `GET /system/health`
 
-**描述**: 检查服务健康状态
+**描述**: 系统健康检查（带 code 包装）
 
 **请求参数**: 无
 
@@ -394,13 +426,18 @@ GET /api/grades?refresh=true
 
 ---
 
-### 3.2 系统统计
+### 3.3 系统统计
 
 **接口**: `GET /system/stats`
 
 **描述**: 获取完整系统统计数据
 
-**请求参数**: 无
+**认证**: 🔒 **仅管理员可访问**
+
+**请求头**:
+```
+Authorization: <admin_token>
+```
 
 **响应示例**:
 ```json
@@ -425,6 +462,7 @@ GET /api/grades?refresh=true
     "cache": {
       "totalCacheRecords": 3750,
       "scheduleCache": 1250,
+      "gradeCache": 1250,
       "ecardCache": 1250,
       "userInfoCache": 1250
     },
@@ -435,11 +473,18 @@ GET /api/grades?refresh=true
 
 ---
 
-### 3.3 用户统计
+### 3.4 用户统计
 
 **接口**: `GET /system/stats/users`
 
 **描述**: 获取用户维度统计
+
+**认证**: 🔒 **仅管理员可访问**
+
+**请求头**:
+```
+Authorization: <admin_token>
+```
 
 **响应示例**:
 ```json
@@ -459,11 +504,18 @@ GET /api/grades?refresh=true
 
 ---
 
-### 3.4 会话统计
+### 3.5 会话统计
 
 **接口**: `GET /system/stats/sessions`
 
 **描述**: 获取会话维度统计
+
+**认证**: 🔒 **仅管理员可访问**
+
+**请求头**:
+```
+Authorization: <admin_token>
+```
 
 **响应示例**:
 ```json
@@ -480,7 +532,7 @@ GET /api/grades?refresh=true
 
 ---
 
-### 3.5 缓存统计
+### 3.6 缓存统计
 
 **接口**: `GET /system/stats/cache`
 
@@ -500,6 +552,7 @@ Authorization: <admin_token>
   "data": {
     "totalCacheRecords": 3750,
     "scheduleCache": 1250,
+    "gradeCache": 1250,
     "ecardCache": 1250,
     "userInfoCache": 1250
   }
@@ -508,7 +561,7 @@ Authorization: <admin_token>
 
 ---
 
-### 3.6 活跃用户排行
+### 3.7 活跃用户排行
 
 **接口**: `GET /system/stats/active-users`
 
@@ -555,11 +608,11 @@ GET /system/stats/active-users?limit=20
 所有 `/system/stats/*` 路径下的统计接口需要管理员权限。
 
 **管理员学号白名单**:
-- `202412040130` - 喻祥云（系统管理员）
+- 通过环境变量 `ADMIN_STUDENT_IDS` 配置（逗号分隔）
 
 ### 4.2 访问流程
 
-1. 管理员使用学号 `202412040130` 登录
+1. 管理员使用白名单学号登录
 2. 获取 Token
 3. 带上 Token 访问统计接口
 
@@ -570,7 +623,7 @@ curl -X POST http://localhost:3000/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "sessionId": "<sessionId>",
-    "username": "202412040130",
+    "username": "<admin_student_id>",
     "password": "<password>",
     "code": "<captcha>"
   }'
@@ -636,7 +689,8 @@ curl http://localhost:3000/system/stats \
 ```json
 {
   "code": 401,
-  "msg": "请先登录"
+  "msg": "登录凭证已失效，请重新登录",
+  "action": "RELOGIN"
 }
 ```
 
@@ -684,9 +738,8 @@ curl http://localhost:3000/system/stats \
 - 收到 401 错误时清除 Token 并跳转登录
 
 ### 6.2 缓存优化
-- 优先使用缓存数据，减少服务器压力
-- 仅在必要时使用 `refresh=true`
-- 一卡通数据总是实时的，无需刷新
+- 用户信息支持 30 天缓存，`refresh=true` 可强制刷新
+- 课表/成绩/一卡通当前默认实时，避免使用过期数据
 
 ### 6.3 错误处理
 - 区分 401（需要重新登录）和 500（服务异常）
@@ -706,8 +759,8 @@ curl http://localhost:3000/system/stats \
 
 | 标识 | 说明 | 适用接口 |
 |------|------|---------|
-| cache | 缓存数据 | 课表、用户信息 |
-| network | 实时数据 | 一卡通 |
+| cache | 缓存数据 | 用户信息 |
+| network | 实时数据 | 课表、成绩、一卡通 |
 
 ### B. 速率限制汇总
 
@@ -715,14 +768,15 @@ curl http://localhost:3000/system/stats \
 |---------|----- -|
 | 验证码 | 20 次/分钟 |
 | 登录 | 10 次/分钟 |
-| 业务 API | 60 次/分钟 |
-| 管理员 API | 100 次/分钟 |
+| 业务 API | 60 次/分钟（按客户端 IP） |
+| 管理员 API | 100 次/分钟（按学号） |
 | 系统公开 API | 无限制 |
 
 ### C. 缓存策略汇总
 
 | 数据类型 | TTL | 刷新策略 |
 |---------|-----|---------|
-| 课表 | 动态（周一零点过期）| 支持强制刷新 |
+| 课表 | 当前无缓存 | 固定实时 |
+| 成绩 | 当前无缓存 | 固定实时 |
 | 一卡通 | 无缓存 | 总是实时 |
 | 用户信息 | 30 天 | 支持强制刷新 |

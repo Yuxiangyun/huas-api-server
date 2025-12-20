@@ -7,9 +7,9 @@
 
 ### 1.2 核心特性
 - ✅ **持久化登录**: Token 与学校 Session 解绑，支持长期登录
-- ✅ **缓存优先**: 采用 SWR 策略，减少学校服务器压力
+- ✅ **缓存策略可配置**: 当前仅用户信息缓存，课表/成绩/一卡通默认实时
 - ✅ **多端支持**: 同一用户可在多设备登录，数据互通
-- ✅ **智能刷新**: 差异化缓存策略，符合实际使用场景
+- ✅ **按需刷新**: `refresh` 参数保留，用户信息支持强制刷新
 - ✅ **安全防护**: 速率限制、SQL 注入防御、XSS 防护
 
 ### 1.3 技术栈
@@ -123,11 +123,13 @@ src/
 │   └── index.ts               # 数据库初始化
 ├── parsers/                   # 解析器层
 │   ├── ECardParser.ts         # 一卡通解析器
+│   ├── GradeParser.ts         # 成绩解析器
 │   ├── ScheduleParser.ts      # 课表解析器
 │   └── UserParser.ts          # 用户信息解析器
 ├── routes/                    # 路由层
 │   ├── api.routes.ts          # 业务 API 路由
 │   ├── auth.routes.ts         # 认证路由
+│   ├── proxy.routes.ts        # 代理路由
 │   └── system.routes.ts       # 系统路由
 ├── services/                  # 服务层
 │   ├── BaseService.ts         # 基础服务抽象类
@@ -181,7 +183,7 @@ sequenceDiagram
     Service-->>Client: 返回数据
 ```
 
-### 3.2 数据获取流程（SWR 策略）
+### 3.2 数据获取流程（可选缓存）
 
 ```mermaid
 graph TB
@@ -201,6 +203,8 @@ graph TB
     FetchNetwork -->|学校异常| Return500[返回 500]
 ```
 
+**说明**: 当前仅用户信息启用缓存；课表/成绩/一卡通默认实时。
+
 ### 3.3 会话管理
 
 #### 会话生命周期
@@ -208,7 +212,7 @@ graph TB
 临时会话 (验证码阶段)
     ↓ 登录成功
 活跃会话 (已绑定学号)
-    ↓ 90天未活跃 或 主动退出
+    ↓ 30天未活跃 或 主动退出
 已删除
 ```
 
@@ -216,23 +220,12 @@ graph TB
 | 类型 | 条件 | 清理时间 | 执行频率 |
 |------|------|---------|---------|
 | 僵尸会话 | 未登录且超过 10 分钟 | 立即 | 每小时 |
-| 不活跃会话 | 90 天未活跃 | 立即 | 每小时 |
+| 不活跃会话 | 30 天未活跃 | 立即 | 每小时 |
 
 ### 3.4 缓存策略
 
-```typescript
-// 课表缓存：动态 TTL
-const isExpired = (updatedAt: number) => {
-    const thisMonday = getThisMonday(); // 本周一 00:00
-    return updatedAt < thisMonday;
-};
-
-// 用户信息缓存：固定 30 天
-const TTL = 30 * 24 * 60 * 60 * 1000;
-
-// 一卡通：无缓存（总是实时）
-const TTL = 0;
-```
+- **用户信息**：30 天缓存，可 `refresh` 强制刷新
+- **课表/成绩/一卡通**：当前禁用缓存（固定实时）
 
 ---
 
@@ -310,10 +303,11 @@ const TTL = 0;
 
 **type 枚举值**:
 - `SCHEDULE`: 课表
+- `GRADES`: 成绩
 - `ECARD`: 一卡通
 - `USER_INFO`: 用户信息
 
-**用途**: 存储业务数据缓存，按学号隔离
+**用途**: 存储业务数据缓存，按学号隔离（当前主要用于用户信息）
 
 ---
 
@@ -325,7 +319,8 @@ const TTL = 0;
 |---------|------|--------|
 | 验证码 | 20 次 | 1 分钟 |
 | 登录 | 10 次 | 1 分钟 |
-| 业务 API | 60 次 | 1 分钟 |
+| 业务 API | 60 次（按 IP） | 1 分钟 |
+| 管理员 API | 100 次（按学号） | 1 分钟 |
 
 **实现**: 内存存储 + 定时清理
 
@@ -338,7 +333,7 @@ const TOKEN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 // 会话验证
 1. 检查 Token 格式
 2. 查询数据库
-3. 验证是否已登录（student_id 非空）
+3. 业务层校验 student_id（未登录则拒绝）
 ```
 
 ### 5.3 SQL 注入防御
@@ -373,7 +368,8 @@ maskStudentId("202401001")
 - ✅ Prepared Statements（减少编译开销）
 
 ### 6.2 缓存策略
-- ✅ 差异化 TTL（符合实际使用场景）
+- ✅ 用户信息缓存（30 天）
+- ⚠️ 课表/成绩/一卡通当前禁用缓存（默认实时）
 - ✅ 联合主键（student_id + type）高效查询
 - ✅ 定期清理过期数据（释放存储空间）
 
@@ -403,15 +399,19 @@ maskStudentId("202401001")
 | 任务 | 执行频率 | 说明 |
 |------|---------|------|
 | 清理僵尸会话 | 每小时 | 删除 10 分钟未登录的临时会话 |
-| 清理不活跃会话 | 每小时 | 删除 90 天未活跃的会话 |
+| 清理不活跃会话 | 每小时 | 删除 30 天未活跃的会话 |
 | 清理过期缓存 | 每小时 | 删除 60 天未更新的缓存 |
-| 性能指标上报 | 每 5 分钟 | 上报系统性能指标 |
 
 ### 7.3 健康检查
 
-**接口**: `GET /system/health`
+**接口**: `GET /health` / `GET /system/health`
 
 **返回**: 服务状态、运行时间
+
+**监控端口**（`MONITOR_PORT`）:
+- `GET /metrics.json`
+- `GET /status.json`
+- `GET /dashboard`
 
 ---
 
@@ -450,6 +450,8 @@ maskStudentId("202401001")
 PORT=3000
 NODE_ENV=production
 CORS_ORIGINS=https://yourdomain.com
+MONITOR_PORT=13001
+MONITOR_HOST=0.0.0.0
 
 # 数据库配置
 DB_PATH=/var/lib/huas-api/huas.sqlite
@@ -464,6 +466,9 @@ LOG_ENABLE_FILE=true
 LOGIN_RATE_LIMIT=10
 CAPTCHA_RATE_LIMIT=20
 API_RATE_LIMIT=60
+
+# 管理员学号白名单（逗号分隔）
+ADMIN_STUDENT_IDS=202412040130
 ```
 
 ---
@@ -481,7 +486,7 @@ API_RATE_LIMIT=60
 
 ### 9.2 功能扩展
 
-- [ ] 成绩查询
+- [x] 成绩查询
 - [ ] 考试安排
 - [ ] 图书馆查询
 - [ ] 消息推送
@@ -532,7 +537,6 @@ tail -f logs/app.log
 
 ### C. 技术债务
 
-- [ ] users 表缺少 created_at 字段
 - [ ] 缺少外键级联删除配置
 - [ ] 缺少数据库版本管理
 - [ ] 缺少软删除机制

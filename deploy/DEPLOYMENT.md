@@ -53,6 +53,8 @@ vi .env
 ```bash
 # CORS 来源（替换为实际域名）
 CORS_ORIGINS=https://your-domain.com
+MONITOR_PORT=13001
+MONITOR_HOST=0.0.0.0
 
 # 数据库路径
 DB_PATH=/var/lib/huas-api/huas.sqlite
@@ -64,6 +66,9 @@ LOG_FILE_PATH=/var/log/huas-api/app.log
 LOGIN_RATE_LIMIT=5
 CAPTCHA_RATE_LIMIT=15
 API_RATE_LIMIT=100
+
+# 管理员学号白名单（逗号分隔）
+ADMIN_STUDENT_IDS=202412040130
 ```
 
 ### 4. 执行部署
@@ -305,7 +310,7 @@ sudo ./deploy/deploy.sh
 
 ### 性能问题
 
-1. 查看性能指标：`curl http://localhost:12103/metrics`
+1. 查看性能指标：`curl http://localhost:13001/metrics.json`
 2. 检查内存使用：`free -h`
 3. 检查磁盘 IO：`iostat -x 1`
 4. 调整速率限制配置
@@ -343,8 +348,8 @@ sudo ./deploy/deploy.sh
    - 定期清理过期数据
 
 2. **缓存策略**
-   - 调整缓存 TTL
-   - 监控缓存命中率
+   - 用户信息缓存 30 天，其他接口默认实时
+   - 按需再引入缓存或调整 TTL
 
 3. **系统调优**
    - 调整文件描述符限制

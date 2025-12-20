@@ -9,9 +9,9 @@
 ### 核心特性
 
 - 🔐 **持久化登录** - Token 与学校 Session 解绑，支持长期登录
-- 🚀 **缓存优先** - 采用 SWR 策略，大幅提升响应速度
+- 🚀 **缓存策略可配置** - 当前仅用户信息缓存，课表/成绩/一卡通默认实时
 - 📱 **多端支持** - 同一用户可在多设备登录，数据互通
-- 🧠 **智能刷新** - 差异化缓存策略，符合实际使用场景
+- 🧠 **按需刷新** - `refresh` 参数保留，用户信息支持强制刷新
 - 🛡️ **安全防护** - 速率限制、SQL 注入防御、XSS 防护
 - 📊 **数据统计** - 完善的用户统计和数据分析功能
 
@@ -89,7 +89,7 @@ bun run db:vacuum    # 优化数据库
 - [API 文档](./doc/API.md) - 完整的接口文档
 - [架构设计](./doc/ARCHITECTURE.md) - 系统架构和设计理念
 - [路由文档](./doc/ROUTES.md) - 路由系统详解
-- [测试文档](./TEST.md) - 测试规范和覆盖
+- [测试文档](./doc/TESTING.md) - 测试规范和覆盖
 
 ## 🌐 API 概览
 
@@ -105,7 +105,7 @@ POST /auth/logout        # 退出登录
 
 ```
 GET /api/grades         # 获取成绩单（含汇总）
-GET /api/schedule        # 获取课表（支持缓存）
+GET /api/schedule        # 获取课表（默认实时）
 GET /api/ecard           # 获取一卡通（实时）
 GET /api/user            # 获取用户信息（支持缓存）
 ```
@@ -113,6 +113,7 @@ GET /api/user            # 获取用户信息（支持缓存）
 ### 系统模块
 
 ```
+GET /health                        # 健康检查（根路径）
 GET /system/health                  # 健康检查
 GET /system/stats                   # 系统统计
 GET /system/stats/users             # 用户统计
@@ -120,6 +121,8 @@ GET /system/stats/sessions          # 会话统计
 GET /system/stats/cache             # 缓存统计
 GET /system/stats/active-users      # 活跃用户排行
 ```
+
+`/system/stats/*` 需要管理员 Token 访问。
 
 ## 📂 项目结构
 
@@ -146,8 +149,10 @@ huas-api/
 │   ├── db.sh            # 数据库管理
 │   ├── deploy.sh        # 部署脚本
 │   └── test.sh          # 测试脚本
+├── monitor/              # 监控面板静态资源
 ├── doc/                 # 文档
 └── deploy/              # 部署配置
+index.html               # 简易管理页面
 ```
 
 ## 🔧 配置
@@ -163,6 +168,8 @@ huas-api/
 PORT=3000
 NODE_ENV=production
 CORS_ORIGINS=https://yourdomain.com
+MONITOR_PORT=13001
+MONITOR_HOST=0.0.0.0
 
 # 数据库配置
 DB_PATH=/var/lib/huas-api/huas.sqlite
@@ -177,6 +184,9 @@ LOG_ENABLE_FILE=true
 LOGIN_RATE_LIMIT=10
 CAPTCHA_RATE_LIMIT=20
 API_RATE_LIMIT=60
+
+# 管理员学号白名单（逗号分隔，支持多个）
+ADMIN_STUDENT_IDS=202412040130
 ```
 
 ## 🚢 部署
@@ -212,8 +222,11 @@ sudo journalctl -u huas-api -f
 # 健康检查（生产环境）
 curl http://localhost:12103/health
 
-# 性能指标（生产环境）
-curl http://localhost:12103/metrics
+# 监控指标（独立端口）
+curl http://localhost:13001/status.json
+curl http://localhost:13001/metrics.json
+# 监控面板（浏览器）
+http://localhost:13001/dashboard
 ```
 
 ### 手动部署
@@ -230,13 +243,29 @@ vim .env
 bun run start
 ```
 
+### Docker 部署
+
+```bash
+# 构建镜像
+docker build -t huas-api .
+
+# 运行容器（建议绑定数据目录）
+docker run -d --name huas-api \
+  -p 3000:3000 -p 13001:13001 \
+  -e PORT=3000 \
+  -e MONITOR_PORT=13001 \
+  -e DB_PATH=/data/huas.sqlite \
+  -v huas-api-data:/data \
+  huas-api
+```
+
 ## 📊 数据库
 
 ### 数据库设计
 
 - **users** - 用户主表（学号、姓名、班级）
 - **sessions** - 会话表（Token、Cookies、状态）
-- **data_cache** - 缓存表（课表、一卡通、用户信息）
+- **data_cache** - 缓存表（当前主要用于用户信息，其他类型按需启用）
 
 ### 索引优化
 

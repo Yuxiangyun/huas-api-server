@@ -213,7 +213,7 @@
            class="absolute -right-4 -bottom-4 w-24 h-24 opacity-10 rotate-[-15deg] pointer-events-none grayscale">
 
       <div class="w-16 h-16 bg-gray-100 rounded-full border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden shadow-inner z-10">
-        <div id="userAvatar" class="w-full h-full flex items-center justify-center text-[68px] leading-none select-none"></div>
+        <div id="userAvatar" class="w-full h-full flex items-center justify-center text-[48px] leading-none select-none"></div>
       </div>
 
       <div class="flex-1 min-w-0 z-10">
@@ -382,1117 +382,1272 @@
   </div>
 
   <script>
-    /*****************************************************************
-     * ✅ 修复点汇总（逻辑层面）
-     *
-     * 1) 401 自动重登短路：401 时 token 仍存在，ensureRelogin 直接“已有 token”返回 true
-     *    -> 现在 401 会先 setToken('') 让 ensureRelogin 真正触发 tryAutoRelogin
-     *
-     * 2) retryFn 形参不生效：handleFetchError 现在支持“网络类错误”按 key 仅重试一次（避免死循环）
-     *
-     * 3) 登录时验证码准备顺序：先确保 sessionId/验证码图，再检查是否输入验证码
-     *
-     * 4) authVersion 防旧响应覆盖：loadXxx 增加 authVersion 检查；token 变化即丢弃旧响应
-     *
-     * 5) NO_TOKEN 自动重登冷却：无保存凭据/自动重登失败后短时间不再重复 ensureRelogin
-     *
-     * 6) bootstrapWithToken 补齐 panelLoaded.user = true
-     *****************************************************************/
+/**
+ * ============================================================
+ * 文理小助手（单文件重构版，Vanilla SPA）
+ * ------------------------------------------------------------
+ * 目标：
+ * 1) 保持原有 UI/交互/接口契约不变（DOM id、onclick 入口不变）
+ * 2) 彻底解决竞态覆盖、成绩双请求、接口失败未判定、Loading 并发闪烁等逻辑问题
+ * 3) 代码分区明确（“生成级别注释”）：状态/存储/API/业务/渲染/控制器
+ *
+ * 注意：不讨论安全；只做逻辑正确性与可维护性优化。
+ * ============================================================
+ */
+(() => {
+  'use strict';
 
-    const API_BASE = '';  // 同源部署建议留空
-    const DEBUG = true;   // 关闭日志可设 false
+  /*****************************************************************
+   * 0) 配置
+   *****************************************************************/
+  const API_BASE = '';  // 同源部署建议留空
+  const DEBUG = true;
 
-    // iOS 低饱和糖果色
-    const COURSE_COLORS = [
-      'bg-[#E8F2FF] border-[#B6D6F5] text-[#004085]',
-      'bg-[#E8F8F5] border-[#A3E4D7] text-[#0E6251]',
-      'bg-[#FEF9E7] border-[#F9E79F] text-[#9C640C]',
-      'bg-[#FFF0F0] border-[#F5B7B1] text-[#922B21]',
-      'bg-[#F3E5F5] border-[#D7BDE2] text-[#6A1B9A]',
-      'bg-[#E0F2F1] border-[#80CBC4] text-[#004D40]',
-      'bg-[#FBE9E7] border-[#FFCCBC] text-[#BF360C]'
-    ];
+  // 课程配色（保持原样）
+  const COURSE_COLORS = [
+    'bg-[#E8F2FF] border-[#B6D6F5] text-[#004085]',
+    'bg-[#E8F8F5] border-[#A3E4D7] text-[#0E6251]',
+    'bg-[#FEF9E7] border-[#F9E79F] text-[#9C640C]',
+    'bg-[#FFF0F0] border-[#F5B7B1] text-[#922B21]',
+    'bg-[#F3E5F5] border-[#D7BDE2] text-[#6A1B9A]',
+    'bg-[#E0F2F1] border-[#80CBC4] text-[#004D40]',
+    'bg-[#FBE9E7] border-[#FFCCBC] text-[#BF360C]'
+  ];
 
-    /***********************
-     * 0) 日志工具（全覆盖）
-     ***********************/
-    const log  = (...args) => DEBUG && console.log('%c[UI]', 'color:#007AFF;font-weight:bold', ...args);
-    const warn = (...args) => DEBUG && console.warn('%c[UI]', 'color:#FF9500;font-weight:bold', ...args);
-    const err  = (...args) => DEBUG && console.error('%c[UI]', 'color:#FF3B30;font-weight:bold', ...args);
-    function group(title, fn) {
-      if (!DEBUG) return fn();
-      console.groupCollapsed(`%c[UI] ${title}`, 'color:#007AFF;font-weight:bold');
-      try { return fn(); } finally { console.groupEnd(); }
+  /*****************************************************************
+   * 1) DOM Helpers
+   *****************************************************************/
+  const $ = (id) => document.getElementById(id);
+
+  function toggleHidden(el, hidden) {
+    if (!el) return;
+    el.classList.toggle('hidden', !!hidden);
+  }
+
+  /*****************************************************************
+   * 2) Logger（可替换为 noop / 上报系统）
+   *****************************************************************/
+  const log  = (...args) => DEBUG && console.log('%c[UI]', 'color:#007AFF;font-weight:bold', ...args);
+  const warn = (...args) => DEBUG && console.warn('%c[UI]', 'color:#FF9500;font-weight:bold', ...args);
+  const err  = (...args) => DEBUG && console.error('%c[UI]', 'color:#FF3B30;font-weight:bold', ...args);
+
+  function group(title, fn) {
+    if (!DEBUG) return fn();
+    console.groupCollapsed(`%c[UI] ${title}`, 'color:#007AFF;font-weight:bold');
+    try { return fn(); } finally { console.groupEnd(); }
+  }
+
+  /*****************************************************************
+   * 3) 轻量 Store（单文件内的“模块化”）
+   *    - 避免全局变量散落；并为“并发/状态机”提供统一入口
+   *****************************************************************/
+  function createStore(initial) {
+    let state = structuredClone(initial);
+    const subs = new Set();
+    return {
+      get: () => state,
+      set: (patch) => {
+        const next = (typeof patch === 'function') ? patch(state) : { ...state, ...patch };
+        state = next;
+        subs.forEach(fn => fn(state));
+      },
+      subscribe: (fn) => { subs.add(fn); return () => subs.delete(fn); }
+    };
+  }
+
+  /*****************************************************************
+   * 4) 核心状态（严格兼容你原有字段语义）
+   *****************************************************************/
+  const uiStore = createStore({
+    /** ✅ 只在 logout 时递增：用于防止“登出后旧请求写回” */
+    sessionVersion: 0,
+    /** Loading 引用计数：并发请求不会提前关掉遮罩 */
+    loadingCount: 0,
+  });
+
+  const authStore = createStore({
+    /** token & 版本：每次 token 变化递增，用于丢弃旧响应 */
+    token: localStorage.getItem('huas_token') || '',
+    authVersion: 0,
+
+    /** 验证码会话与状态 */
+    sessionId: '',
+    requireCaptcha: false,
+
+    /** single-flight：多个请求同时触发只登录一次 */
+    reauthPromise: null,
+    isRelogging: false,
+
+    /** 登录互斥锁：防止用户狂点“进入系统” */
+    loginPromise: null,
+
+    /** 防重复弹窗 */
+    reauthFailedNotified: false,
+    noTokenNotified: false,
+
+    /** ✅ NO_TOKEN 自动重登冷却 */
+    AUTO_RELOGIN_COOLDOWN_MS: 8000,
+    lastAutoReloginFailedAt: 0,
+
+    /** ✅ 网络错误按 key 仅重试一次（窗口期） */
+    RETRY_WINDOW_MS: 5000,
+  });
+
+  /*****************************************************************
+   * 5) Loading（引用计数）
+   *****************************************************************/
+  function setLoading(on) {
+    uiStore.set(s => {
+      const nextCount = Math.max(0, s.loadingCount + (on ? 1 : -1));
+      return { ...s, loadingCount: nextCount };
+    });
+    const { loadingCount } = uiStore.get();
+    toggleHidden($('loading'), loadingCount === 0);
+  }
+
+  /*****************************************************************
+   * 6) 基础 UI 切换（保持原有 id/结构）
+   *****************************************************************/
+  function showLogin() {
+    toggleHidden($('dataArea'), true);
+    toggleHidden($('loginCard'), false);
+  }
+
+  function showData() {
+    toggleHidden($('loginCard'), true);
+    toggleHidden($('dataArea'), false);
+  }
+
+  function setLoginButtonDisabled(disabled) {
+    const btn = $('loginBtn');
+    if (!btn) return;
+    btn.disabled = disabled;
+    btn.classList.toggle('opacity-60', disabled);
+    btn.classList.toggle('pointer-events-none', disabled);
+  }
+
+  // HTML 里按钮在用
+  window.toggleAboutModal = function(show) {
+    toggleHidden($('aboutModal'), !show);
+  };
+
+  /*****************************************************************
+   * 7) Credentials Repo（保持你原逻辑：localStorage + IndexedDB，多 key 备份）
+   *****************************************************************/
+  const SAVED_CRED_KEY = 'huas_saved_cred';
+  const SAVED_CRED_KEYS = [SAVED_CRED_KEY, 'huas_saved_cred_bak1', 'huas_saved_cred_bak2'];
+  const IDB_CONFIG = { name: 'huasCredDB', store: 'creds', key: 'primary' };
+
+  function readCredentialsLocal() {
+    for (const key of SAVED_CRED_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.username || parsed.password)) return parsed;
+      } catch {}
     }
+    return null;
+  }
 
-    /***********************
-     * 1) 全局状态
-     ***********************/
-    let currentSessionId = '';
-    let requireCaptcha = false;
+  function saveCredentialsLocal(payload) {
+    try {
+      const data = JSON.stringify(payload);
+      SAVED_CRED_KEYS.forEach(k => localStorage.setItem(k, data));
+    } catch {}
+  }
 
-    // 单飞重登 Promise：多个请求同时触发只登录一次
-    let reauthPromise = null;
-    let isRelogging = false;
+  function clearCredentialsLocal() {
+    SAVED_CRED_KEYS.forEach(k => localStorage.removeItem(k));
+  }
 
-    // 登录互斥锁：防止用户狂点“进入系统”
-    let loginPromise = null;
+  function openCredDB() {
+    return new Promise((resolve) => {
+      if (!('indexedDB' in window)) return resolve(null);
+      const req = indexedDB.open(IDB_CONFIG.name, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_CONFIG.store)) db.createObjectStore(IDB_CONFIG.store);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    });
+  }
 
-    // ✅ 只在 logout 时递增：用于防止“登出后旧请求写回”
-    let sessionVersion = 0;
+  async function saveCredentialsIndexedDB(payload) {
+    const db = await openCredDB();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
+      tx.objectStore(IDB_CONFIG.store).put(payload, IDB_CONFIG.key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  }
 
-    // ✅ 每次 token 变更都会递增：用于丢弃旧 token 发起的旧响应
-    let authVersion = 0;
+  async function loadCredentialsIndexedDB() {
+    const db = await openCredDB();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      const tx = db.transaction(IDB_CONFIG.store, 'readonly');
+      const req = tx.objectStore(IDB_CONFIG.store).get(IDB_CONFIG.key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  }
 
-    // 面板加载标记
-    const panelLoaded = { schedule: false, grades: false, ecard: false, user: false };
-    let autoLoginAttempted = false;
+  async function clearCredentialsIndexedDB() {
+    const db = await openCredDB();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
+      tx.objectStore(IDB_CONFIG.store).delete(IDB_CONFIG.key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  }
 
-    // token（运行态）与本地存储
-    let globalToken = localStorage.getItem('huas_token') || '';
-
-    // 保存凭据（保持原逻辑）
-    const SAVED_CRED_KEY = 'huas_saved_cred';
-    const SAVED_CRED_KEYS = [SAVED_CRED_KEY, 'huas_saved_cred_bak1', 'huas_saved_cred_bak2'];
-    const IDB_CONFIG = { name: 'huasCredDB', store: 'creds', key: 'primary' };
-
-    // 防重复弹窗
-    let reauthFailedNotified = false;
-    let noTokenNotified = false;
-
-    // ✅ NO_TOKEN 自动重登冷却
-    const AUTO_RELOGIN_COOLDOWN_MS = 8000;
-    let lastAutoReloginFailedAt = 0;
-
-    // ✅ 网络错误仅重试一次的记录（避免 retryFn 递归死循环）
-    const RETRY_WINDOW_MS = 5000;
-    const retryOnceMap = new Map(); // key -> timestamp
-
-    /***********************
-     * 2) UI 工具
-     ***********************/
-    function setLoading(isLoading) {
-      document.getElementById('loading').classList.toggle('hidden', !isLoading);
+  async function getSavedCredentials() {
+    try {
+      const local = readCredentialsLocal();
+      if (local) return local;
+      const idb = await loadCredentialsIndexedDB();
+      return idb || null;
+    } catch {
+      return null;
     }
-    function showLogin() {
-      document.getElementById('dataArea').classList.add('hidden');
-      document.getElementById('loginCard').classList.remove('hidden');
+  }
+
+  async function saveCredentialsIfNeeded(username, password) {
+    const remember = $('rememberMe')?.checked;
+    if (remember) {
+      const payload = { username, password, remember: true };
+      saveCredentialsLocal(payload);
+      await saveCredentialsIndexedDB(payload);
+    } else {
+      clearCredentialsLocal();
+      await clearCredentialsIndexedDB();
     }
-    function showData() {
-      document.getElementById('loginCard').classList.add('hidden');
-      document.getElementById('dataArea').classList.remove('hidden');
-    }
-    function bumpSessionVersion(reason = '') {
-      sessionVersion += 1;
-      log('sessionVersion++ =>', sessionVersion, reason ? `(reason: ${reason})` : '');
-    }
-    function setLoginButtonDisabled(disabled) {
-      const btn = document.getElementById('loginBtn');
-      if (!btn) return;
-      btn.disabled = disabled;
-      btn.classList.toggle('opacity-60', disabled);
-      btn.classList.toggle('pointer-events-none', disabled);
-    }
-    function toggleAboutModal(show) {
-      const modal = document.getElementById('aboutModal');
-      modal.classList.toggle('hidden', !show);
-    }
+  }
 
-    /***********************
-     * 3) Token 统一入口
-     ***********************/
-    function setToken(token, reason = '') {
-      globalToken = token || '';
-      authVersion += 1;
-
-      if (globalToken) localStorage.setItem('huas_token', globalToken);
-      else localStorage.removeItem('huas_token');
-
-      log('setToken()', {
-        authVersion,
-        hasToken: !!globalToken,
-        tokenPreview: globalToken ? String(globalToken).slice(0, 12) + '...' : '',
-        reason
-      });
-    }
-
-    /***********************
-     * 4) Fetch 封装（NO_TOKEN 也自动登录 + 401 强制清 token 再重登）
-     ***********************/
-    async function apiFetch(path, { method = 'GET', headers = {}, body, cache = 'no-store', retry = true } = {}) {
-      const url = `${API_BASE}${path}`;
-
-      // ✅ 无 token：尝试自动登录
-      if (!globalToken) {
-        warn('apiFetch: NO_TOKEN -> try ensureRelogin()', { url, retry, authVersion, sessionVersion });
-
-        if (!retry) throw new Error('NO_TOKEN');
-
-        const ok = await ensureRelogin('NO_TOKEN');
-        if (!ok || !globalToken) {
-          warn('apiFetch: ensureRelogin failed -> still NO_TOKEN', { url, ok, hasToken: !!globalToken });
-          throw new Error('NO_TOKEN');
-        }
-
-        log('apiFetch: ensureRelogin success -> token restored', { url, authVersion });
+  async function loadSavedCredentialsToUI() {
+    try {
+      const saved = await getSavedCredentials();
+      if (!saved) {
+        log('no saved credentials -> default rememberMe checked');
+        if ($('rememberMe')) $('rememberMe').checked = true;
+        return;
       }
 
-      log('apiFetch ->', { url, method, retry, hasToken: !!globalToken, authVersion, sessionVersion });
+      const { username, password, remember } = saved;
+      if (username) $('username').value = username;
+      if (password) $('password').value = password;
+      if (remember !== undefined && $('rememberMe')) $('rememberMe').checked = remember;
+    } catch (e) {
+      err('loadSavedCredentialsToUI error', e);
+    }
+  }
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          ...headers,
-          Authorization: globalToken,
-          ...(body ? { 'Content-Type': 'application/json' } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        cache
+  /*****************************************************************
+   * 8) Request Gate（并发治理）
+   *    - singleFlight：同 key 并发复用一次请求
+   *    - latestAbortable：同 key 连续触发，取消前一个，仅最后一次允许写回
+   *****************************************************************/
+  function createRequestGate() {
+    const inFlight = new Map();          // key -> Promise
+    const aborters = new Map();          // key -> AbortController
+    const latestSeq = new Map();         // key -> number
+
+    return {
+      async singleFlight(key, fn) {
+        if (inFlight.has(key)) return inFlight.get(key);
+        const p = (async () => fn())().finally(() => inFlight.delete(key));
+        inFlight.set(key, p);
+        return p;
+      },
+
+      /**
+       * latestAbortable：
+       * - 对于“刷新类”非常关键（成绩面板）
+       * - 取消旧请求，避免浪费；且保证最后一次写回
+       *
+       * @param {string} key
+       * @param {(signal:AbortSignal)=>Promise<any>} fn
+       */
+      async latestAbortable(key, fn) {
+        // 递增序号，标记本次为“最新意图”
+        const seq = (latestSeq.get(key) || 0) + 1;
+        latestSeq.set(key, seq);
+
+        // 取消旧请求
+        const prev = aborters.get(key);
+        if (prev) prev.abort();
+        const ac = new AbortController();
+        aborters.set(key, ac);
+
+        const result = await fn(ac.signal);
+
+        // 若期间又有更新意图（seq 被改了），则丢弃
+        if (latestSeq.get(key) !== seq) {
+          const e = new Error('STALE_RESPONSE_DROPPED');
+          e.code = 'STALE_RESPONSE_DROPPED';
+          throw e;
+        }
+        return result;
+      }
+    };
+  }
+
+  const requestGate = createRequestGate();
+
+  /*****************************************************************
+   * 9) 错误判断 & 统一重试一次窗口
+   *****************************************************************/
+  const retryOnceMap = new Map(); // key -> timestamp
+
+  function isNetworkErrorMessage(msg) {
+    const s = String(msg || '');
+    return (
+      s.includes('Failed to fetch') ||
+      s.includes('NetworkError') ||
+      s.includes('Load failed') ||
+      s.includes('网络') ||
+      s.includes('timeout') ||
+      s.includes('超时')
+    );
+  }
+
+  /*****************************************************************
+   * 10) Token 管理（严格保留你的语义：authVersion++、localStorage 同步）
+   *****************************************************************/
+  function setToken(token, reason = '') {
+    authStore.set(s => ({ ...s, token: token || '', authVersion: s.authVersion + 1 }));
+    const { token: t, authVersion } = authStore.get();
+
+    if (t) localStorage.setItem('huas_token', t);
+    else localStorage.removeItem('huas_token');
+
+    log('setToken()', {
+      authVersion,
+      hasToken: !!t,
+      tokenPreview: t ? String(t).slice(0, 12) + '...' : '',
+      reason
+    });
+  }
+
+  function hasToken() {
+    return !!authStore.get().token;
+  }
+
+  /*****************************************************************
+   * 11) AuthService（验证码/登录/自动重登 single-flight + 冷却）
+   *****************************************************************/
+  async function fetchCaptchaSession({ forceShow = false, withSpinner = false } = {}) {
+    if (withSpinner) setLoading(true);
+
+    group('fetchCaptchaSession()', () => {
+      const s = authStore.get();
+      log('params', { forceShow, withSpinner, requireCaptcha: s.requireCaptcha, sessionId: s.sessionId });
+    });
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/captcha`, { cache: 'no-store' });
+      const json = await res.json();
+      log('captcha response', json);
+
+      if (json.code === 200) {
+        authStore.set(s => ({ ...s, sessionId: json.data.sessionId }));
+        // 这里“即使不强制展示”，也把图片准备好；需要时立刻可显示
+        const img = $('captchaImg');
+        if (img) {
+          img.src = 'data:image/png;base64,' + json.data.image;
+        }
+
+        if (forceShow) {
+          authStore.set(s => ({ ...s, requireCaptcha: true }));
+          toggleHidden($('captchaBlock'), false);
+          toggleHidden($('captchaImg'), false);
+          toggleHidden($('captchaText'), true);
+        } else {
+          // 不强制显示：保持你原“按需显示”逻辑
+          if (!authStore.get().requireCaptcha) toggleHidden($('captchaBlock'), true);
+        }
+        return true;
+      }
+
+      alert('验证码获取失败: ' + (json.msg || '未知错误'));
+      return false;
+    } catch (e) {
+      err('fetchCaptchaSession error', e);
+      alert('验证码请求错误');
+      return false;
+    } finally {
+      if (withSpinner) setLoading(false);
+    }
+  }
+
+  async function ensureCaptchaSession(forceShow = false, withSpinner = false) {
+    const s = authStore.get();
+    if (!s.sessionId) {
+      // 需要 sessionId：拉一次 captcha session（不一定展示）
+      await fetchCaptchaSession({ forceShow, withSpinner });
+      return;
+    }
+    if (forceShow) {
+      authStore.set(st => ({ ...st, requireCaptcha: true }));
+      toggleHidden($('captchaBlock'), false);
+    }
+  }
+
+  async function performLogin(username, password, captcha, quiet = false, retryCount = 0) {
+    group(`performLogin(quiet=${quiet})`, () => {
+      const s = authStore.get();
+      log('payload draft', {
+        username,
+        hasPwd: !!password,
+        hasCaptcha: !!captcha,
+        requireCaptcha: s.requireCaptcha,
+        sessionId: s.sessionId,
+        retryCount
+      });
+    });
+
+    try {
+      // ✅ 严格实现你原要求：登录前确保 sessionId/验证码图已准备
+      // - 但优化：如果不需要展示验证码，不额外打开验证码 UI
+      await ensureCaptchaSession(authStore.get().requireCaptcha, false);
+
+      const s = authStore.get();
+      const payload = { sessionId: s.sessionId, username, password };
+      if (s.requireCaptcha || captcha) payload.code = captcha;
+
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      // 非 401：直接返回
-      if (res.status !== 401) return res;
+      const json = await res.json();
+      log('login response', json);
 
-      // ✅ 401：会话过期 -> 先强制清掉 token，避免 ensureRelogin 因“已有 token”短路
-      warn('apiFetch: got 401 -> SESSION_EXPIRED', { url, retry });
-      setToken('', 'apiFetch 401 -> invalidate token');
+      if (json.code === 200) {
+        setToken(json.token, quiet ? 'silent relogin / auto login' : 'interactive login');
+
+        authStore.set(st => ({
+          ...st,
+          reauthFailedNotified: false,
+          noTokenNotified: false,
+          lastAutoReloginFailedAt: 0,
+          requireCaptcha: false
+        }));
+
+        toggleHidden($('captchaBlock'), true);
+
+        if (!quiet) {
+          await saveCredentialsIfNeeded(username, password);
+        }
+        return true;
+      }
+
+      // 需要验证码：进入验证码态 + 拉新图
+      if (json.action === 'NEED_CAPTCHA') {
+        warn('login need captcha', json.msg);
+
+        authStore.set(st => ({ ...st, requireCaptcha: true }));
+        toggleHidden($('captchaBlock'), false);
+        if ($('captcha')) $('captcha').value = '';
+
+        await fetchCaptchaSession({ forceShow: true, withSpinner: false });
+
+        if (!quiet) alert(json.msg || '登录失败，需要验证码，请输入验证码后再试');
+        return false;
+      }
+
+      // 会话ID无效：刷新 sessionId 后仅重试一次（保持你原逻辑）
+      if (json.code === 400 && json.msg && String(json.msg).includes('会话ID无效')) {
+        warn('login invalid sessionId -> refresh captcha session', { retryCount });
+        if (retryCount >= 1) {
+          if (!quiet) alert('会话多次失效，请刷新验证码后重试');
+          return false;
+        }
+        authStore.set(st => ({ ...st, sessionId: '' }));
+        await fetchCaptchaSession({ forceShow: false, withSpinner: false });
+        return performLogin(username, password, '', quiet, retryCount + 1);
+      }
+
+      warn('login failed', json.msg);
+      if (!quiet) alert('登录失败: ' + (json.msg || '未知错误'));
+
+      // 自动登录失败且不是 NEED_CAPTCHA：进入冷却
+      if (quiet && !authStore.get().requireCaptcha) {
+        authStore.set(st => ({ ...st, lastAutoReloginFailedAt: Date.now() }));
+      }
+      return false;
+
+    } catch (e) {
+      err('login error', e);
+      if (!quiet) alert('登录请求错误');
+
+      if (quiet && !authStore.get().requireCaptcha) {
+        authStore.set(st => ({ ...st, lastAutoReloginFailedAt: Date.now() }));
+      }
+      return false;
+    }
+  }
+
+  async function tryAutoRelogin() {
+    const s = authStore.get();
+    if (s.isRelogging) {
+      warn('tryAutoRelogin: already relogging -> skip');
+      return false;
+    }
+
+    const saved = await getSavedCredentials();
+    if (!saved || !saved.username || !saved.password || saved.remember !== true) {
+      warn('tryAutoRelogin: no saved credentials / remember not true', saved);
+      authStore.set(st => ({ ...st, lastAutoReloginFailedAt: Date.now() }));
+      return false;
+    }
+
+    authStore.set(st => ({ ...st, isRelogging: true }));
+    group('tryAutoRelogin()', () => log('saved credentials found', { username: saved.username, remember: saved.remember }));
+
+    try {
+      // 重置验证码态（保持你原设计）
+      authStore.set(st => ({ ...st, sessionId: '', requireCaptcha: false }));
+
+      const ok = await performLogin(saved.username, saved.password, '', true);
+      log('tryAutoRelogin result', { ok, hasToken: hasToken(), authVersion: authStore.get().authVersion });
+
+      if (!ok && !authStore.get().requireCaptcha) {
+        authStore.set(st => ({ ...st, lastAutoReloginFailedAt: Date.now() }));
+      }
+      return ok;
+    } finally {
+      authStore.set(st => ({ ...st, isRelogging: false }));
+    }
+  }
+
+  async function ensureRelogin(trigger = '') {
+    const s = authStore.get();
+    const now = Date.now();
+
+    // ✅ NO_TOKEN/AUTO_ON_LOAD 冷却（401 不冷却）
+    if ((trigger === 'NO_TOKEN' || trigger === 'AUTO_ON_LOAD') &&
+        s.lastAutoReloginFailedAt &&
+        (now - s.lastAutoReloginFailedAt) < s.AUTO_RELOGIN_COOLDOWN_MS) {
+      warn('ensureRelogin: cooldown active -> skip', {
+        trigger,
+        cooldownLeftMs: s.AUTO_RELOGIN_COOLDOWN_MS - (now - s.lastAutoReloginFailedAt)
+      });
+      return false;
+    }
+
+    // single-flight：并发复用同一个 reauthPromise
+    if (!s.reauthPromise) {
+      const p = (async () => {
+        group(`ensureRelogin(trigger=${trigger})`, () => {
+          const st = authStore.get();
+          log('start', { requireCaptcha: st.requireCaptcha, hasToken: hasToken(), authVersion: st.authVersion });
+        });
+
+        // 如果已经被其它并发请求修复了 token，则直接成功
+        if (hasToken()) {
+          log('ensureRelogin: already has token -> skip login');
+          return true;
+        }
+
+        const ok = await tryAutoRelogin();
+        log('ensureRelogin: result', { ok, hasToken: hasToken(), authVersion: authStore.get().authVersion });
+        return ok;
+      })().finally(() => {
+        authStore.set(st => ({ ...st, reauthPromise: null }));
+        log('ensureRelogin: end (reauthPromise cleared)');
+      });
+
+      authStore.set(st => ({ ...st, reauthPromise: p }));
+    } else {
+      log('ensureRelogin: reuse existing reauthPromise (single-flight)');
+    }
+
+    return authStore.get().reauthPromise;
+  }
+
+  /*****************************************************************
+   * 12) ApiClient（严格：非 2xx / code!=200 直接 throw；401 自动重登重放一次）
+   *****************************************************************/
+  async function apiFetchJson(path, { method='GET', headers={}, body, cache='no-store', retry=true, signal } = {}) {
+    const url = `${API_BASE}${path}`;
+
+    // ✅ 无 token：尝试自动登录（与你原逻辑一致）
+    if (!hasToken()) {
+      warn('apiFetchJson: NO_TOKEN -> ensureRelogin()', { url, retry });
+      if (!retry) throw new Error('NO_TOKEN');
+
+      const ok = await ensureRelogin('NO_TOKEN');
+      if (!ok || !hasToken()) throw new Error('NO_TOKEN');
+    }
+
+    const token = authStore.get().token;
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        ...headers,
+        Authorization: token,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      cache,
+      signal
+    });
+
+    // 401：强制清 token -> ensureRelogin('401') -> 重放一次
+    if (res.status === 401) {
+      warn('apiFetchJson: got 401 -> invalidate token', { url, retry });
+      setToken('', 'apiFetchJson 401 -> invalidate token');
 
       if (!retry) throw new Error('SESSION_EXPIRED');
 
       const ok = await ensureRelogin('401');
       if (!ok) throw new Error('SESSION_EXPIRED');
 
-      // 重登成功 -> 重试一次（retry=false 防止死循环）
-      return apiFetch(path, { method, headers, body, cache, retry: false });
+      // 重放一次（retry=false 防死循环）
+      return apiFetchJson(path, { method, headers, body, cache, retry: false, signal });
     }
 
-    /***********************
-     * 5) ensureRelogin（single-flight + 冷却）
-     ***********************/
-    async function ensureRelogin(trigger = '') {
-      const now = Date.now();
-
-      // ✅ NO_TOKEN/AUTO_ON_LOAD 的冷却（401 不冷却）
-      if ((trigger === 'NO_TOKEN' || trigger === 'AUTO_ON_LOAD') &&
-          lastAutoReloginFailedAt &&
-          (now - lastAutoReloginFailedAt) < AUTO_RELOGIN_COOLDOWN_MS) {
-        warn('ensureRelogin: cooldown active -> skip', {
-          trigger,
-          cooldownLeftMs: AUTO_RELOGIN_COOLDOWN_MS - (now - lastAutoReloginFailedAt)
-        });
-        return false;
-      }
-
-      if (!reauthPromise) {
-        reauthPromise = (async () => {
-          group(`ensureRelogin(trigger=${trigger})`, () => {
-            log('start', { isRelogging, requireCaptcha, hasToken: !!globalToken, authVersion, sessionVersion });
-          });
-
-          // 如果已经有 token 了（可能被别的并发请求修复了），直接成功
-          if (globalToken) {
-            log('ensureRelogin: already has token -> skip login');
-            return true;
-          }
-
-          const ok = await tryAutoRelogin();
-          log('ensureRelogin: result', { ok, hasToken: !!globalToken, authVersion });
-
-          return ok;
-        })().finally(() => {
-          reauthPromise = null;
-          log('ensureRelogin: end (reauthPromise cleared)');
-        });
-      } else {
-        log('ensureRelogin: reuse existing reauthPromise (single-flight)');
-      }
-      return reauthPromise;
+    // ✅ 非 2xx：直接抛错（修复“失败当成功”的逻辑漏洞）
+    if (!res.ok) {
+      const msg = `HTTP_${res.status}`;
+      throw new Error(msg);
     }
 
-    /***********************
-     * 6) 验证码：按需加载
-     ***********************/
-    async function initCaptcha(forceShow = false, withSpinner = false) {
-      if (withSpinner) setLoading(true);
+    const json = await res.json();
 
-      group('initCaptcha()', () => {
-        log('params', { forceShow, withSpinner, requireCaptcha, currentSessionId });
+    // ✅ 只要返回包含 code 且不为 200，就视为失败
+    // （你原来的 user/ecard/schedule 没判定，现在统一）
+    if (json && typeof json === 'object' && 'code' in json && json.code !== 200) {
+      throw new Error(json.msg || 'API_ERROR');
+    }
+
+    return json;
+  }
+
+  /*****************************************************************
+   * 13) 面板加载标记（保持原语义）
+   *****************************************************************/
+  const panelLoaded = { schedule: false, grades: false, ecard: false, user: false };
+  let autoLoginAttempted = false;
+
+  /*****************************************************************
+   * 14) 渲染函数（保持 DOM id 与样式不变）
+   *****************************************************************/
+  function renderUser(data) {
+    if (!data) return;
+    $('uiName').innerText = data.name ?? '--';
+    $('uiId').innerText = data.studentId ?? '--';
+    $('uiClass').innerText = data.className ?? '--';
+    const avatar = $('userAvatar');
+    if (avatar) avatar.textContent = '👾';
+  }
+
+  function renderEcard(data) {
+    if (!data) return;
+
+    let statusText = data.status;
+    if (!statusText || String(statusText).includes('未知')) statusText = '正常';
+
+    const balanceText = (data.balance === undefined || data.balance === null) ? '0.00' : data.balance;
+
+    const elStatus = $('ecStatus');
+    elStatus.innerText = statusText;
+
+    if (statusText === '正常') {
+      elStatus.className = "px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded text-[10px] font-bold text-green-600";
+    } else {
+      elStatus.className = "px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded text-[10px] font-bold text-red-600";
+    }
+    $('ecBalance').innerText = balanceText;
+  }
+
+  // 课表渲染（保持你原布局；仅保留逻辑结构，避免无谓改动）
+  function renderSchedule(data) {
+    if (!data) return;
+    $('schWeek').innerText = data.week || 'Schedule';
+
+    const container = $('scheduleContainer');
+    const isMobile = window.innerWidth < 768;
+    const leftColWidth = isMobile ? 50 : 60;
+    const dayMinWidth = isMobile ? 90 : 110;
+    container.style.minWidth = `${leftColWidth + 7 * dayMinWidth}px`;
+
+    // 兼容：section 可能是 "1-2" / "1-4" / "1-2,3-4" 等
+    // ✅ 优化但不改变你原展示规则：仍然以“起始节次”落格（保持一致性）
+    const courseMap = {};
+    if (data.courses && Array.isArray(data.courses)) {
+      data.courses.forEach(c => {
+        const match = String(c.section || '').match(/(\d+)/);
+        if (!match) return;
+        const startNode = parseInt(match[1], 10);
+        const sectionIdx = Math.floor((startNode - 1) / 2);
+        const dayIdx = (c.day || 1) - 1;
+        const key = `${dayIdx}_${sectionIdx}`;
+        if (!courseMap[key]) courseMap[key] = [];
+        courseMap[key].push(c);
       });
-
-      try {
-        const res = await fetch(`${API_BASE}/auth/captcha`, { cache: 'no-store' });
-        const json = await res.json();
-        log('captcha response', json);
-
-        if (json.code === 200) {
-          currentSessionId = json.data.sessionId;
-
-          const img = document.getElementById('captchaImg');
-          img.src = 'data:image/png;base64,' + json.data.image;
-          img.classList.remove('hidden');
-          document.getElementById('captchaText').classList.add('hidden');
-
-          if (forceShow) {
-            requireCaptcha = true;
-            document.getElementById('captchaBlock').classList.remove('hidden');
-          } else if (!requireCaptcha) {
-            document.getElementById('captchaBlock').classList.add('hidden');
-          }
-        } else {
-          alert('验证码获取失败: ' + json.msg);
-        }
-      } catch (e) {
-        err('initCaptcha error', e);
-        alert('验证码请求错误');
-      } finally {
-        if (withSpinner) setLoading(false);
-      }
     }
 
-    async function ensureCaptchaSession(forceShow = false, withSpinner = false) {
-      if (!currentSessionId) {
-        log('ensureCaptchaSession: no sessionId -> initCaptcha');
-        await initCaptcha(forceShow, withSpinner);
-        return;
-      }
-      if (forceShow) {
-        requireCaptcha = true;
-        document.getElementById('captchaBlock').classList.remove('hidden');
-      }
-    }
-
-    /***********************
-     * 7) 登录：按钮点击（交互登录）
-     ***********************/
-    async function handleLogin() {
-      const u = document.getElementById('username').value;
-      const p = document.getElementById('password').value;
-
-      if (!u || !p) return alert('请填写学号和密码');
-
-      // ✅ 修复：先确保验证码 session/图片准备好，再判断是否必须输入验证码
-      await ensureCaptchaSession(requireCaptcha, true);
-
-      const c = document.getElementById('captcha').value;
-      if (requireCaptcha && !c) return alert('请输入验证码');
-
-      setLoginButtonDisabled(true);
-      setLoading(true);
-
-      try {
-        const ok = await performLoginGuarded(u, p, c, false);
-        if (!ok) return;
-
-        showData();
-        await loadAllData(false);
-      } finally {
-        setLoading(false);
-        setLoginButtonDisabled(false);
-      }
-    }
-
-    // 登录互斥锁
-    async function performLoginGuarded(username, password, captcha, quiet = false) {
-      if (!loginPromise) {
-        loginPromise = performLogin(username, password, captcha, quiet, 0)
-          .finally(() => (loginPromise = null));
-      } else {
-        log('performLoginGuarded: reuse loginPromise');
-      }
-      return loginPromise;
-    }
-
-    /***********************
-     * 8) performLogin：真正的登录请求
-     ***********************/
-    async function performLogin(username, password, captcha, quiet = false, retryCount = 0) {
-      group(`performLogin(quiet=${quiet})`, () => {
-        log('payload draft', {
-          username,
-          hasPwd: !!password,
-          hasCaptcha: !!captcha,
-          requireCaptcha,
-          currentSessionId,
-          retryCount
-        });
-      });
-
-      try {
-        const payload = { sessionId: currentSessionId, username, password };
-        if (requireCaptcha || captcha) payload.code = captcha;
-
-        const res = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const json = await res.json();
-        log('login response', json);
-
-        if (json.code === 200) {
-          setToken(json.token, quiet ? 'silent relogin / auto login' : 'interactive login');
-          reauthFailedNotified = false;
-          noTokenNotified = false;
-          lastAutoReloginFailedAt = 0; // ✅ 成功则清冷却
-
-          if (!quiet) {
-            await saveCredentialsIfNeeded(username, password);
-          }
-
-          requireCaptcha = false;
-          document.getElementById('captchaBlock').classList.add('hidden');
-
-          return true;
-        }
-
-        if (json.action === 'NEED_CAPTCHA') {
-          warn('login need captcha', json.msg);
-
-          requireCaptcha = true;
-          document.getElementById('captchaBlock').classList.remove('hidden');
-          document.getElementById('captcha').value = '';
-
-          await initCaptcha(true, false);
-
-          if (!quiet) alert(json.msg || '登录失败，需要验证码，请输入验证码后再试');
-          return false;
-        }
-
-        if (json.code === 400 && json.msg && json.msg.includes('会话ID无效')) {
-          warn('login invalid sessionId -> refresh captcha session', { retryCount });
-
-          if (retryCount >= 1) {
-            if (!quiet) alert('会话多次失效，请刷新验证码后重试');
-            return false;
-          }
-
-          currentSessionId = '';
-          await initCaptcha(false, false);
-          return performLogin(username, password, '', quiet, retryCount + 1);
-        }
-
-        warn('login failed', json.msg);
-        if (!quiet) alert('登录失败: ' + (json.msg || '未知错误'));
-
-        if (requireCaptcha) await initCaptcha(true, false);
-
-        // ✅ 自动登录失败且不是 NEED_CAPTCHA：进入冷却
-        if (quiet && !requireCaptcha) lastAutoReloginFailedAt = Date.now();
-
-        return false;
-      } catch (e) {
-        err('login error', e);
-        if (!quiet) alert('登录请求错误');
-
-        if (quiet && !requireCaptcha) lastAutoReloginFailedAt = Date.now();
-
-        return false;
-      }
-    }
-
-    /***********************
-     * 9) tryAutoRelogin：自动重登/自动登录（quiet）
-     ***********************/
-    async function tryAutoRelogin() {
-      if (isRelogging) {
-        warn('tryAutoRelogin: already relogging -> skip');
-        return false;
-      }
-
-      const saved = await getSavedCredentials();
-      if (!saved || !saved.username || !saved.password || saved.remember !== true) {
-        warn('tryAutoRelogin: no saved credentials / remember not true', saved);
-        lastAutoReloginFailedAt = Date.now(); // ✅ 冷却开始
-        return false;
-      }
-
-      isRelogging = true;
-      group('tryAutoRelogin()', () => {
-        log('saved credentials found', { username: saved.username, remember: saved.remember });
-      });
-
-      try {
-        currentSessionId = '';
-        requireCaptcha = false;
-        await ensureCaptchaSession(false, false);
-
-        const ok = await performLogin(saved.username, saved.password, '', true);
-        log('tryAutoRelogin result', { ok, hasToken: !!globalToken, authVersion });
-
-        if (!ok && !requireCaptcha) lastAutoReloginFailedAt = Date.now();
-
-        return ok;
-      } finally {
-        isRelogging = false;
-      }
-    }
-
-    /***********************
-     * 10) 启动策略：token 探活 -> 并发加载
-     ***********************/
-    async function appStart() {
-      group('appStart()', () => {
-        log('initial', { hasToken: !!globalToken, authVersion, sessionVersion });
-      });
-
-      setLoading(true);
-      try {
-        await loadSavedCredentials();
-
-        if (globalToken) {
-          const ok = await bootstrapWithToken();
-          if (ok) return;
-        }
-
-        const autoOk = await autoLoginOnLoad();
-        if (autoOk) return;
-
-        showLogin();
-        log('appStart: stay on login');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    async function bootstrapWithToken() {
-      group('bootstrapWithToken()', () => {});
-      const v = sessionVersion;
-      const av = authVersion;
-
-      try {
-        const res = await apiFetch('/api/user', { retry: true });
-        const json = await res.json();
-        log('token probe success -> /api/user', json);
-
-        if (v !== sessionVersion || av !== authVersion) {
-          warn('bootstrapWithToken: stale response ignored', { v, sessionVersion, av, authVersion });
-          return false;
-        }
-
-        showData();
-        renderUser(json.data);
-        panelLoaded.user = true; // ✅ 修复：补齐状态标记
-
-        await Promise.all([
-          loadEcard(false, false),
-          loadSchedule(false, false),
-        ]);
-
-        return true;
-      } catch (e) {
-        warn('bootstrapWithToken failed', e);
-
-        if (requireCaptcha) {
-          alert('自动登录需要验证码，请在登录页输入验证码后登录');
-          await handleLogout(true, true);
-          return false;
-        }
-
-        alert('登录已过期，请重新登录');
-        await handleLogout(true, false);
-        return false;
-      }
-    }
-
-    /***********************
-     * 11) 数据加载（允许 NO_TOKEN 进入，由 apiFetch 负责自动登录）
-     ***********************/
-    async function loadAllData(withSpinner = true) {
-      const v = sessionVersion;
-      const av = authVersion;
-      log('loadAllData start', { sessionVersion: v, hasToken: !!globalToken, authVersion: av });
-
-      if (withSpinner) setLoading(true);
-      try {
-        await Promise.all([
-          loadUser(false, false),
-          loadEcard(false, false),
-          loadSchedule(false, false),
-        ]);
-      } finally {
-        if (withSpinner) setLoading(false);
-      }
-    }
-
-    async function loadUser(refresh = false, withSpinner = true) {
-      const v = sessionVersion;
-      const av = authVersion;
-      if (withSpinner) setLoading(true);
-
-      try {
-        if (!globalToken) warn('loadUser: NO_TOKEN -> apiFetch will try auto login');
-
-        const res = await apiFetch(`/api/user${refresh ? '?refresh=true' : ''}`, { retry: true });
-        const json = await res.json();
-
-        if (v !== sessionVersion || av !== authVersion) {
-          warn('loadUser: stale response ignored', { v, sessionVersion, av, authVersion });
-          return;
-        }
-
-        renderUser(json.data);
-        panelLoaded.user = true;
-      } catch (e) {
-        await handleFetchError(e, () => loadUser(refresh, false), '个人信息获取失败', 'loadUser');
-      } finally {
-        if (withSpinner) setLoading(false);
-      }
-    }
-
-    function renderUser(data) {
-      if (!data) return;
-      document.getElementById('uiName').innerText = data.name ?? '--';
-      document.getElementById('uiId').innerText = data.studentId ?? '--';
-      document.getElementById('uiClass').innerText = data.className ?? '--';
-
-      const avatar = document.getElementById('userAvatar');
-      if (avatar) avatar.textContent = '😎';
-    }
-
-    async function loadEcard(refresh = false, withSpinner = true) {
-      const v = sessionVersion;
-      const av = authVersion;
-      if (withSpinner) setLoading(true);
-
-      try {
-        if (!globalToken) warn('loadEcard: NO_TOKEN -> apiFetch will try auto login');
-
-        const res = await apiFetch(`/api/ecard${refresh ? '?refresh=true' : ''}`, { retry: true });
-        const json = await res.json();
-
-        if (v !== sessionVersion || av !== authVersion) {
-          warn('loadEcard: stale response ignored', { v, sessionVersion, av, authVersion });
-          return;
-        }
-
-        renderEcard(json.data);
-        panelLoaded.ecard = true;
-      } catch (e) {
-        await handleFetchError(e, () => loadEcard(refresh, false), '一卡通获取失败', 'loadEcard');
-      } finally {
-        if (withSpinner) setLoading(false);
-      }
-    }
-
-    function renderEcard(data) {
-      if (!data) return;
-
-      let statusText = data.status;
-      if (!statusText || String(statusText).includes('未知')) statusText = '正常';
-
-      const balanceText = (data.balance === undefined || data.balance === null) ? '0.00' : data.balance;
-      const elStatus = document.getElementById('ecStatus');
-
-      elStatus.innerText = statusText;
-      if (statusText === '正常') {
-        elStatus.className = "px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded text-[10px] font-bold text-green-600";
-      } else {
-        elStatus.className = "px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded text-[10px] font-bold text-red-600";
-      }
-      document.getElementById('ecBalance').innerText = balanceText;
-    }
-
-    async function loadSchedule(refresh = false, withSpinner = true) {
-      const v = sessionVersion;
-      const av = authVersion;
-      if (withSpinner) setLoading(true);
-
-      try {
-        if (!globalToken) warn('loadSchedule: NO_TOKEN -> apiFetch will try auto login');
-
-        const res = await apiFetch(`/api/schedule${refresh ? '?refresh=true' : ''}`, { retry: true });
-        const json = await res.json();
-
-        if (v !== sessionVersion || av !== authVersion) {
-          warn('loadSchedule: stale response ignored', { v, sessionVersion, av, authVersion });
-          return;
-        }
-
-        renderSchedule(json.data);
-        panelLoaded.schedule = true;
-      } catch (e) {
-        await handleFetchError(e, () => loadSchedule(refresh, false), '课表获取失败', 'loadSchedule');
-      } finally {
-        if (withSpinner) setLoading(false);
-      }
-    }
-
-    // 固定高度 h-[120px] 确保严格对齐
-    function renderSchedule(data) {
-      if (!data) return;
-      document.getElementById('schWeek').innerText = data.week || 'Schedule';
-
-      const container = document.getElementById('scheduleContainer');
-      const isMobile = window.innerWidth < 768;
-      const leftColWidth = isMobile ? 50 : 60;
-      const dayMinWidth = isMobile ? 90 : 110;
-      container.style.minWidth = `${leftColWidth + 7 * dayMinWidth}px`;
-
-      const courseMap = {};
-      if (data.courses && Array.isArray(data.courses)) {
-        data.courses.forEach(c => {
-          const match = c.section?.match?.(/(\d+)/);
-          if (!match) return;
-          const startNode = parseInt(match[1]);
-          const sectionIdx = Math.floor((startNode - 1) / 2);
-          const dayIdx = (c.day || 1) - 1;
-          const key = `${dayIdx}_${sectionIdx}`;
-          if (!courseMap[key]) courseMap[key] = [];
-          courseMap[key].push(c);
-        });
-      }
-
-      let html = `<div class="grid" style="grid-template-columns:${leftColWidth}px repeat(7, minmax(${dayMinWidth}px,1fr));">`;
-      html += `<div class="sticky-col sticky-shadow bg-[#FFFFFF] border-b border-r border-gray-100 z-40" style="width:${leftColWidth}px"></div>`;
-
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const todayColIdx = (new Date().getDay() + 6) % 7;
-
-      days.forEach((d, i) => {
-        const isToday = i === todayColIdx;
-        const bgClass = isToday ? 'text-iosBlue bg-iosBlue/5 font-bold' : 'text-sub font-semibold';
-        html += `<div class="text-center text-[11px] py-3 border-b border-gray-100 ${bgClass}" data-day="${i}">${d}</div>`;
-      });
-
-      const sections = ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12'];
-      for (let s = 0; s < 6; s++) {
-        html += `
-          <div class="sticky-col sticky-shadow flex items-center justify-center font-semibold text-sub bg-[#FFFFFF] border-r border-b border-gray-100 text-[10px] z-30" style="width:${leftColWidth}px">
-            ${sections[s]}
-          </div>
-        `;
-
-        for (let d = 0; d < 7; d++) {
-          const courses = courseMap[`${d}_${s}`];
-          const colBg = d === todayColIdx ? 'bg-iosBlue/5' : '';
-          html += `<div class="p-1 border-b border-gray-100 border-r border-gray-100 ${colBg} h-[120px] relative" data-day="${d}">`;
-
-          if (courses && courses.length > 0) {
-            html += `<div class="flex flex-col gap-1 h-full">`;
-            courses.forEach((course, idx) => {
-              const colorIdx = (d + s + idx) % COURSE_COLORS.length;
-              const bgClass = COURSE_COLORS[colorIdx];
-              html += `
-                <div class="course-card flex-1 ${bgClass} border border-transparent rounded-lg p-2 shadow-sm cursor-pointer flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all duration-200" title="${course.name || ''}">
-                  <div class="font-bold text-[11px] text-ink leading-tight line-clamp-3 z-10 relative mb-1">
-                    ${course.name || '--'}
-                  </div>
-                  ${course.location ? `
-                    <div class="flex justify-start z-10 relative">
-                      <div class="inline-flex items-start bg-white/60 px-1.5 py-0.5 rounded text-[9px] font-semibold text-ink/80 backdrop-blur-sm max-w-full leading-tight flex-col">
-                        <span class="break-words">${String(course.location).replace('校本部', '').replace(/(楼)[A-Za-z]?\d+.*/, '$1')}</span>
-                        <span class="text-[10px] font-bold">${(String(course.location).match(/(楼)([A-Za-z]?\d+)/) || [,'',''])[2]}</span>
-                      </div>
-                    </div>
-                  ` : ''}
+    let html = `<div class="grid" style="grid-template-columns:${leftColWidth}px repeat(7, minmax(${dayMinWidth}px,1fr));">`;
+    html += `<div class="sticky-col sticky-shadow bg-[#FFFFFF] border-b border-r border-gray-100 z-40" style="width:${leftColWidth}px"></div>`;
+
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const todayColIdx = (new Date().getDay() + 6) % 7;
+
+    days.forEach((d, i) => {
+      const isToday = i === todayColIdx;
+      const bgClass = isToday ? 'text-iosBlue bg-iosBlue/5 font-bold' : 'text-sub font-semibold';
+      html += `<div class="text-center text-[11px] py-3 border-b border-gray-100 ${bgClass}" data-day="${i}">${d}</div>`;
+    });
+
+    const sections = ['1-2', '3-4', '5-6', '7-8', '9-10', '11-12'];
+    for (let s = 0; s < 6; s++) {
+      html += `
+        <div class="sticky-col sticky-shadow flex items-center justify-center font-semibold text-sub bg-[#FFFFFF] border-r border-b border-gray-100 text-[10px] z-30" style="width:${leftColWidth}px">
+          ${sections[s]}
+        </div>
+      `;
+
+      for (let d = 0; d < 7; d++) {
+        const courses = courseMap[`${d}_${s}`];
+        const colBg = d === todayColIdx ? 'bg-iosBlue/5' : '';
+        html += `<div class="p-1 border-b border-gray-100 border-r border-gray-100 ${colBg} h-[120px] relative" data-day="${d}">`;
+
+        if (courses && courses.length > 0) {
+          html += `<div class="flex flex-col gap-1 h-full">`;
+          courses.forEach((course, idx) => {
+            const colorIdx = (d + s + idx) % COURSE_COLORS.length;
+            const bgClass = COURSE_COLORS[colorIdx];
+            html += `
+              <div class="course-card flex-1 ${bgClass} border border-transparent rounded-lg p-2 shadow-sm cursor-pointer flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all duration-200" title="${course.name || ''}">
+                <div class="font-bold text-[11px] text-ink leading-tight line-clamp-3 z-10 relative mb-1">
+                  ${course.name || '--'}
                 </div>
-              `;
-            });
-            html += `</div>`;
-          }
-
+                ${course.location ? `
+                  <div class="flex justify-start z-10 relative">
+                    <div class="inline-flex items-start bg-white/60 px-1.5 py-0.5 rounded text-[9px] font-semibold text-ink/80 backdrop-blur-sm max-w-full leading-tight flex-col">
+                      <span class="break-words">${String(course.location).replace('校本部', '').replace(/(楼)[A-Za-z]?\d+.*/, '$1')}</span>
+                      <span class="text-[10px] font-bold">${(String(course.location).match(/(楼)([A-Za-z]?\d+)/) || [,'',''])[2]}</span>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          });
           html += `</div>`;
         }
-      }
 
-      html += `</div>`;
-      container.innerHTML = html;
-    }
-
-    async function loadGrades(refresh = false) {
-      const v = sessionVersion;
-      const av = authVersion;
-      setLoading(true);
-
-      try {
-        if (!globalToken) warn('loadGrades: NO_TOKEN -> apiFetch will try auto login');
-
-        const res = await apiFetch(`/api/grades${refresh ? '?refresh=true' : ''}`, { retry: true });
-        const json = await res.json();
-
-        if (v !== sessionVersion || av !== authVersion) {
-          warn('loadGrades: stale response ignored', { v, sessionVersion, av, authVersion });
-          return;
-        }
-
-        if (json.code && json.code !== 200) throw new Error(json.msg || '成绩获取失败');
-        renderGrades(json.data);
-        panelLoaded.grades = true;
-      } catch (e) {
-        await handleFetchError(e, () => loadGrades(refresh), '成绩获取失败', 'loadGrades');
-      } finally {
-        setLoading(false);
+        html += `</div>`;
       }
     }
 
-    function renderGrades(data) {
-      if (!data) return;
+    html += `</div>`;
+    container.innerHTML = html;
+  }
 
-      const summary = data.summary || {};
-      document.getElementById('gCredits').innerText = summary.totalCredits ?? '--';
-      document.getElementById('gGpa').innerText = summary.averageGpa ?? '--';
+  function renderGrades(data) {
+    if (!data) return;
 
-      const sourceEl = document.getElementById('gradeSource');
-      if (data._source) {
-        sourceEl.innerText = String(data._source).toUpperCase();
-        sourceEl.classList.remove('hidden');
-      } else {
-        sourceEl.innerText = '';
-        sourceEl.classList.add('hidden');
+    const summary = data.summary || {};
+    $('gCredits').innerText = summary.totalCredits ?? '--';
+    $('gGpa').innerText = summary.averageGpa ?? '--';
+
+    const sourceEl = $('gradeSource');
+    if (data._source) {
+      sourceEl.innerText = String(data._source).toUpperCase();
+      sourceEl.classList.remove('hidden');
+    } else {
+      sourceEl.innerText = '';
+      sourceEl.classList.add('hidden');
+    }
+
+    const list = $('gradeList');
+    list.innerHTML = '';
+
+    const items = data.items || [];
+    if (!items.length) {
+      list.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-8 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+          <div class="text-3xl grayscale opacity-30 mb-2">💯</div>
+          <div class="text-xs font-bold text-sub">暂无成绩数据</div>
+          <div class="text-[10px] text-gray-400 mt-1">请尝试刷新或评教后再试</div>
+        </div>`;
+      return;
+    }
+
+    const groupMap = {};
+    items.forEach(item => {
+      const term = item.term || '未知学期';
+      if (!groupMap[term]) groupMap[term] = [];
+      groupMap[term].push(item);
+    });
+
+    const parseTerm = (term) => {
+      const m = String(term).match(/(\d{4}).*?(\d{4}).*?(\d+)/);
+      if (m) return { y1: parseInt(m[1], 10), y2: parseInt(m[2], 10), sem: parseInt(m[3], 10) };
+      return null;
+    };
+
+    const sortedTerms = Object.keys(groupMap).sort((a, b) => {
+      const pa = parseTerm(a); const pb = parseTerm(b);
+      if (pa && pb) {
+        if (pa.y1 !== pb.y1) return pb.y1 - pa.y1;
+        if (pa.y2 !== pb.y2) return pb.y2 - pa.y2;
+        return (pb.sem || 0) - (pa.sem || 0);
       }
+      return String(b).localeCompare(String(a));
+    });
 
-      const list = document.getElementById('gradeList');
-      list.innerHTML = '';
+    sortedTerms.forEach(term => {
+      list.innerHTML += `
+        <div class="px-2 py-1 text-[11px] font-semibold text-sub uppercase tracking-wider mt-4">
+          ${term}
+        </div>
+        <div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+      `;
 
-      const items = data.items || [];
-      if (!items.length) {
-        list.innerHTML = `
-          <div class="flex flex-col items-center justify-center py-8 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-            <div class="text-3xl grayscale opacity-30 mb-2">💯</div>
-            <div class="text-xs font-bold text-sub">暂无成绩数据</div>
-            <div class="text-[10px] text-gray-400 mt-1">请尝试刷新或评教后再试</div>
-          </div>`;
-        return;
-      }
+      const termItems = groupMap[term];
+      termItems.forEach((item, index) => {
+        const passTag = item.pass === null ? '' : item.pass ? 'text-iosGreen' : 'text-iosRed';
+        const scoreText = item.score !== null ? item.score : item.scoreText || '--';
+        const natureText = item.courseCategory || item.courseAttribute || '';
+        const natureRow = natureText ? `
+          <div class="flex items-center justify-between text-[11px] text-sub mt-1">
+            <span class="bg-gray-100 px-1 rounded">${natureText}</span>
+          </div>` : '';
+        const borderClass = index === termItems.length - 1 ? '' : 'border-b border-gray-100';
 
-      const groupMap = {};
-      items.forEach(item => {
-        const term = item.term || '未知学期';
-        if (!groupMap[term]) groupMap[term] = [];
-        groupMap[term].push(item);
-      });
-
-      const parseTerm = (term) => {
-        const m = String(term).match(/(\d{4}).*?(\d{4}).*?(\d+)/);
-        if (m) return { y1: parseInt(m[1]), y2: parseInt(m[2]), sem: parseInt(m[3]) };
-        return null;
-      };
-
-      const sortedTerms = Object.keys(groupMap).sort((a, b) => {
-        const pa = parseTerm(a); const pb = parseTerm(b);
-        if (pa && pb) {
-          if (pa.y1 !== pb.y1) return pb.y1 - pa.y1;
-          if (pa.y2 !== pb.y2) return pb.y2 - pa.y2;
-          return (pb.sem || 0) - (pa.sem || 0);
-        }
-        return String(b).localeCompare(String(a));
-      });
-
-      sortedTerms.forEach(term => {
         list.innerHTML += `
-          <div class="px-2 py-1 text-[11px] font-semibold text-sub uppercase tracking-wider mt-4">
-            ${term}
-          </div>
-          <div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-        `;
-
-        const termItems = groupMap[term];
-        termItems.forEach((item, index) => {
-          const passTag = item.pass === null ? '' : item.pass ? 'text-iosGreen' : 'text-iosRed';
-          const scoreText = item.score !== null ? item.score : item.scoreText || '--';
-          const natureText = item.courseCategory || item.courseAttribute || '';
-          const natureRow = natureText ? `
-            <div class="flex items-center justify-between text-[11px] text-sub mt-1">
-              <span class="bg-gray-100 px-1 rounded">${natureText}</span>
-            </div>` : '';
-          const borderClass = index === termItems.length - 1 ? '' : 'border-b border-gray-100';
-
-          list.innerHTML += `
-            <div class="p-3.5 ${borderClass} hover:bg-gray-50 transition-colors">
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex-1 min-w-0">
-                  <div class="text-[15px] font-bold text-ink leading-tight mt-0.5 line-clamp-2">${item.courseName || '--'}</div>
-                  <div class="text-[12px] text-sub font-mono mt-0.5">${item.courseCode || '--'}</div>
-                </div>
-                <div class="flex flex-col items-end text-right">
-                  <div class="text-[17px] font-bold ${passTag}">${scoreText}</div>
-                  <div class="text-[11px] text-sub mt-0.5">学分 ${item.credit ?? '--'} · 绩点 ${item.gpa ?? '--'}</div>
-                </div>
+          <div class="p-3.5 ${borderClass} hover:bg-gray-50 transition-colors">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="text-[15px] font-bold text-ink leading-tight mt-0.5 line-clamp-2">${item.courseName || '--'}</div>
+                <div class="text-[12px] text-sub font-mono mt-0.5">${item.courseCode || '--'}</div>
               </div>
-              ${natureRow}
+              <div class="flex flex-col items-end text-right">
+                <div class="text-[17px] font-bold ${passTag}">${scoreText}</div>
+                <div class="text-[11px] text-sub mt-0.5">学分 ${item.credit ?? '--'} · 绩点 ${item.gpa ?? '--'}</div>
+              </div>
             </div>
-          `;
-        });
-
-        list.innerHTML += `</div>`;
-      });
-    }
-
-    /***********************
-     * 12) Panel & 刷新
-     ***********************/
-    function togglePanel(name, forceOpen = null) {
-      const container = document.getElementById(`panelContent-${name}`);
-      const wrapper = document.querySelector(`[data-panel="${name}"]`);
-      const arrow = document.getElementById('gradeArrow');
-
-      const isOpen = !container.classList.contains('hidden');
-      const next = forceOpen !== null ? forceOpen : !isOpen;
-
-      container.classList.toggle('hidden', !next);
-      wrapper?.setAttribute('data-open', next ? 'true' : 'false');
-      if (arrow) arrow.style.transform = next ? 'rotate(180deg)' : 'rotate(0deg)';
-
-      if (next && name === 'grades' && !panelLoaded.grades) loadGrades(false);
-    }
-
-    function refreshGradesButton() {
-      const container = document.getElementById('panelContent-grades');
-      if (container.classList.contains('hidden')) togglePanel('grades', true);
-      loadGrades(true);
-    }
-
-    /***********************
-     * 13) 统一错误处理（含网络重试一次）
-     ***********************/
-    function isNetworkErrorMessage(msg) {
-      const s = String(msg || '');
-      return (
-        s.includes('Failed to fetch') ||
-        s.includes('NetworkError') ||
-        s.includes('Load failed') ||
-        s.includes('网络') ||
-        s.includes('timeout') ||
-        s.includes('超时')
-      );
-    }
-
-    async function handleFetchError(error, retryFn, fallbackMsg = '请求失败', retryKey = '') {
-      let msg = error?.message || String(error);
-      warn('handleFetchError', { msg, error, requireCaptcha, hasToken: !!globalToken, authVersion, sessionVersion, retryKey });
-
-      // ✅ 自动重登需要验证码：引导用户回登录页输入验证码
-      if (requireCaptcha) {
-        alert('自动登录需要验证码，请在登录页输入验证码后登录');
-        await handleLogout(true, true);
-        return;
-      }
-
-      // ✅ 网络错误：按 key 在窗口期内只重试一次，避免死循环
-      if (retryFn && retryKey && isNetworkErrorMessage(msg)) {
-        const key = `${retryKey}|sv:${sessionVersion}|av:${authVersion}`;
-        const now = Date.now();
-        const last = retryOnceMap.get(key) || 0;
-
-        if (now - last > RETRY_WINDOW_MS) {
-          retryOnceMap.set(key, now);
-          warn('network error -> retry once', { key });
-
-          try {
-            await new Promise(r => setTimeout(r, 250));
-            await retryFn();
-            return;
-          } catch (e2) {
-            msg = e2?.message || String(e2);
-            warn('retry once failed', { key, msg, e2 });
-            // 继续走下面的兜底提示
-          }
-        }
-      }
-
-      if (msg === 'NO_TOKEN') {
-        if (!noTokenNotified) {
-          alert('请先登录');
-          noTokenNotified = true;
-        }
-        await handleLogout(true, false);
-        return;
-      }
-
-      if (msg === 'SESSION_EXPIRED') {
-        if (!reauthFailedNotified) {
-          alert('登录已过期，请重新登录');
-          reauthFailedNotified = true;
-        }
-        await handleLogout(true, false);
-        return;
-      }
-
-      alert(fallbackMsg);
-    }
-
-    /***********************
-     * 14) 登出
-     ***********************/
-    async function handleLogout(preserveCreds = true, keepCaptchaState = false) {
-      group('handleLogout()', () => {
-        log('logout params', { preserveCreds, keepCaptchaState, hasToken: !!globalToken, authVersion, sessionVersion });
+            ${natureRow}
+          </div>
+        `;
       });
 
-      bumpSessionVersion('logout');
-      setToken('', 'logout');
+      list.innerHTML += `</div>`;
+    });
+  }
 
-      panelLoaded.schedule = panelLoaded.grades = panelLoaded.ecard = panelLoaded.user = false;
+  /*****************************************************************
+   * 15) 数据加载（严格保留：sessionVersion/authVersion 丢弃旧响应）
+   *****************************************************************/
+  async function loadUser(refresh = false, withSpinner = true) {
+    const { sessionVersion } = uiStore.get();
+    const { authVersion } = authStore.get();
+    if (withSpinner) setLoading(true);
 
-      if (!keepCaptchaState) {
-        requireCaptcha = false;
-        currentSessionId = '';
-        document.getElementById('captcha').value = '';
-        document.getElementById('captchaBlock').classList.add('hidden');
-      } else {
-        // ✅ 保留/进入验证码态：强制刷新一张新的验证码图
-        requireCaptcha = true;
-        currentSessionId = '';
-        document.getElementById('captcha').value = '';
-        document.getElementById('captchaBlock').classList.remove('hidden');
-        await initCaptcha(true, false);
+    try {
+      const json = await apiFetchJson(`/api/user${refresh ? '?refresh=true' : ''}`, { retry: true });
+      // 旧响应丢弃
+      if (sessionVersion !== uiStore.get().sessionVersion || authVersion !== authStore.get().authVersion) {
+        warn('loadUser: stale response ignored');
+        return;
+      }
+      renderUser(json.data);
+      panelLoaded.user = true;
+    } catch (e) {
+      await handleFetchError(e, () => loadUser(refresh, false), '个人信息获取失败', 'loadUser');
+    } finally {
+      if (withSpinner) setLoading(false);
+    }
+  }
+
+  async function loadEcard(refresh = false, withSpinner = true) {
+    const { sessionVersion } = uiStore.get();
+    const { authVersion } = authStore.get();
+    if (withSpinner) setLoading(true);
+
+    try {
+      const json = await apiFetchJson(`/api/ecard${refresh ? '?refresh=true' : ''}`, { retry: true });
+      if (sessionVersion !== uiStore.get().sessionVersion || authVersion !== authStore.get().authVersion) {
+        warn('loadEcard: stale response ignored');
+        return;
+      }
+      renderEcard(json.data);
+      panelLoaded.ecard = true;
+    } catch (e) {
+      await handleFetchError(e, () => loadEcard(refresh, false), '一卡通获取失败', 'loadEcard');
+    } finally {
+      if (withSpinner) setLoading(false);
+    }
+  }
+
+  async function loadSchedule(refresh = false, withSpinner = true) {
+    const { sessionVersion } = uiStore.get();
+    const { authVersion } = authStore.get();
+    if (withSpinner) setLoading(true);
+
+    try {
+      const json = await apiFetchJson(`/api/schedule${refresh ? '?refresh=true' : ''}`, { retry: true });
+      if (sessionVersion !== uiStore.get().sessionVersion || authVersion !== authStore.get().authVersion) {
+        warn('loadSchedule: stale response ignored');
+        return;
+      }
+      renderSchedule(json.data);
+      panelLoaded.schedule = true;
+    } catch (e) {
+      await handleFetchError(e, () => loadSchedule(refresh, false), '课表获取失败', 'loadSchedule');
+    } finally {
+      if (withSpinner) setLoading(false);
+    }
+  }
+
+  /**
+   * ✅ 成绩加载：采用 latestAbortable 根治竞态覆盖
+   * - 打开面板首加载 / 用户疯狂刷新：只允许最后一次写回
+   * - 自动取消旧请求，避免浪费
+   */
+  async function loadGrades(refresh = false) {
+    const sv = uiStore.get().sessionVersion;
+    const av = authStore.get().authVersion;
+
+    setLoading(true);
+    try {
+      const json = await requestGate.latestAbortable('grades', (signal) => {
+        return apiFetchJson(`/api/grades${refresh ? '?refresh=true' : ''}`, { retry: true, signal });
+      });
+
+      if (sv !== uiStore.get().sessionVersion || av !== authStore.get().authVersion) {
+        warn('loadGrades: stale response ignored');
+        return;
       }
 
-      showLogin();
-
-      if (!preserveCreds) {
-        clearCredentialsLocal();
-        await clearCredentialsIndexedDB();
+      renderGrades(json.data);
+      panelLoaded.grades = true;
+    } catch (e) {
+      if (e && e.code === 'STALE_RESPONSE_DROPPED') {
+        // 旧请求被取消/丢弃：正常情况，不提示
+        return;
       }
+      await handleFetchError(e, () => loadGrades(refresh), '成绩获取失败', 'loadGrades');
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      await loadSavedCredentials();
+  async function loadAllData(withSpinner = true) {
+    const v = uiStore.get().sessionVersion;
+    const av = authStore.get().authVersion;
+    log('loadAllData start', { sessionVersion: v, authVersion: av, hasToken: hasToken() });
+
+    if (withSpinner) setLoading(true);
+    try {
+      await Promise.all([
+        loadUser(false, false),
+        loadEcard(false, false),
+        loadSchedule(false, false),
+      ]);
+    } finally {
+      if (withSpinner) setLoading(false);
+    }
+  }
+
+  /*****************************************************************
+   * 16) Panel 控制（修复：成绩刷新双请求）
+   *****************************************************************/
+  window.togglePanel = function(name, forceOpen = null, options = {}) {
+    const container = $(`panelContent-${name}`);
+    const wrapper = document.querySelector(`[data-panel="${name}"]`);
+    const arrow = $('gradeArrow');
+
+    const isOpen = !container.classList.contains('hidden');
+    const next = forceOpen !== null ? forceOpen : !isOpen;
+
+    container.classList.toggle('hidden', !next);
+    wrapper?.setAttribute('data-open', next ? 'true' : 'false');
+
+    // 目前只有成绩箭头，保持原行为
+    if (arrow) arrow.style.transform = next ? 'rotate(180deg)' : 'rotate(0deg)';
+
+    // ✅ 默认：打开成绩面板且未加载 -> 首次加载
+    // ✅ 修复：支持 options.skipAutoLoad，避免刷新按钮导致“双请求”
+    if (next && name === 'grades' && !panelLoaded.grades && !options.skipAutoLoad) {
+      loadGrades(false);
+    }
+  };
+
+  window.refreshGradesButton = function() {
+    const container = $('panelContent-grades');
+    const isHidden = container.classList.contains('hidden');
+
+    // ✅ 关键修复：打开面板时跳过 autoLoad（否则会 loadGrades(false) + loadGrades(true) 并发）
+    if (isHidden) window.togglePanel('grades', true, { skipAutoLoad: true });
+
+    // ✅ 只发一次：明确刷新
+    loadGrades(true);
+  };
+
+  /*****************************************************************
+   * 17) 统一错误处理（保留你原策略：网络重试一次 + NO_TOKEN/SESSION_EXPIRED）
+   *****************************************************************/
+  async function handleFetchError(error, retryFn, fallbackMsg = '请求失败', retryKey = '') {
+    let msg = error?.message || String(error);
+    const s = authStore.get();
+    warn('handleFetchError', { msg, requireCaptcha: s.requireCaptcha, hasToken: hasToken(), retryKey });
+
+    // ✅ 自动重登需要验证码：引导用户回登录页输入验证码
+    if (authStore.get().requireCaptcha) {
+      alert('自动登录需要验证码，请在登录页输入验证码后登录');
+      await handleLogout(true, true);
+      return;
     }
 
-    /***********************
-     * 15) 保存凭据（保持原逻辑）
-     ***********************/
-    async function loadSavedCredentials() {
-      try {
-        const saved = await getSavedCredentials();
-        if (!saved) {
-          log('no saved credentials found -> default rememberMe checked');
-          document.getElementById('rememberMe').checked = true;
+    // ✅ 网络错误：按 key 在窗口期内只重试一次
+    if (retryFn && retryKey && isNetworkErrorMessage(msg)) {
+      const key = `${retryKey}|sv:${uiStore.get().sessionVersion}|av:${authStore.get().authVersion}`;
+      const now = Date.now();
+      const last = retryOnceMap.get(key) || 0;
+
+      if (now - last > authStore.get().RETRY_WINDOW_MS) {
+        retryOnceMap.set(key, now);
+        warn('network error -> retry once', { key });
+
+        try {
+          await new Promise(r => setTimeout(r, 250));
+          await retryFn();
           return;
+        } catch (e2) {
+          msg = e2?.message || String(e2);
+          warn('retry once failed', { key, msg, e2 });
         }
-
-        const { username, password, remember } = saved;
-        if (username) document.getElementById('username').value = username;
-        if (password) document.getElementById('password').value = password;
-        if (remember !== undefined) document.getElementById('rememberMe').checked = remember;
-      } catch (e) {
-        err('loadSavedCredentials error', e);
       }
     }
 
-    async function autoLoginOnLoad() {
-      if (autoLoginAttempted) return false;
-      autoLoginAttempted = true;
+    if (msg === 'NO_TOKEN') {
+      if (!authStore.get().noTokenNotified) {
+        alert('请先登录');
+        authStore.set(st => ({ ...st, noTokenNotified: true }));
+      }
+      await handleLogout(true, false);
+      return;
+    }
 
-      const saved = await getSavedCredentials();
-      if (!saved || !saved.username || !saved.password || saved.remember !== true) {
-        log('autoLoginOnLoad skipped', { hasSaved: !!saved, remember: saved?.remember });
+    if (msg === 'SESSION_EXPIRED' || msg.startsWith('HTTP_')) {
+      // HTTP_401 已在 apiFetchJson 内处理；这里更多是 403/500 等
+      if (!authStore.get().reauthFailedNotified && msg === 'SESSION_EXPIRED') {
+        alert('登录已过期，请重新登录');
+        authStore.set(st => ({ ...st, reauthFailedNotified: true }));
+      } else if (msg.startsWith('HTTP_')) {
+        alert(fallbackMsg);
+      }
+      if (msg === 'SESSION_EXPIRED') await handleLogout(true, false);
+      return;
+    }
+
+    alert(fallbackMsg);
+  }
+
+  /*****************************************************************
+   * 18) 登出（严格保留：sessionVersion++、token 清理、captcha 状态可保留）
+   *****************************************************************/
+  window.handleLogout = async function(preserveCreds = true, keepCaptchaState = false) {
+    group('handleLogout()', () => {
+      log('logout params', { preserveCreds, keepCaptchaState, hasToken: hasToken() });
+    });
+
+    // sessionVersion++（严格保留语义）
+    uiStore.set(s => ({ ...s, sessionVersion: s.sessionVersion + 1 }));
+    log('sessionVersion++ =>', uiStore.get().sessionVersion, '(reason: logout)');
+
+    setToken('', 'logout');
+
+    panelLoaded.schedule = panelLoaded.grades = panelLoaded.ecard = panelLoaded.user = false;
+
+    if (!keepCaptchaState) {
+      authStore.set(st => ({ ...st, requireCaptcha: false, sessionId: '' }));
+      if ($('captcha')) $('captcha').value = '';
+      toggleHidden($('captchaBlock'), true);
+    } else {
+      // 保留/进入验证码态：刷新一张新的验证码图
+      authStore.set(st => ({ ...st, requireCaptcha: true, sessionId: '' }));
+      if ($('captcha')) $('captcha').value = '';
+      toggleHidden($('captchaBlock'), false);
+      await fetchCaptchaSession({ forceShow: true, withSpinner: false });
+    }
+
+    showLogin();
+
+    if (!preserveCreds) {
+      clearCredentialsLocal();
+      await clearCredentialsIndexedDB();
+    }
+
+    await loadSavedCredentialsToUI();
+  };
+
+  /*****************************************************************
+   * 19) 登录入口（保持 HTML onclick=handleLogin）
+   *****************************************************************/
+  window.handleLogin = async function() {
+    const u = $('username').value;
+    const p = $('password').value;
+
+    if (!u || !p) return alert('请填写学号和密码');
+
+    // ✅ 顺序要求：先确保 sessionId/验证码图，再检查验证码输入
+    await ensureCaptchaSession(authStore.get().requireCaptcha, false);
+
+    const c = $('captcha')?.value;
+    if (authStore.get().requireCaptcha && !c) return alert('请输入验证码');
+
+    setLoginButtonDisabled(true);
+    setLoading(true);
+
+    try {
+      // 登录互斥锁（严格保留语义）
+      const s = authStore.get();
+      if (!s.loginPromise) {
+        const promise = (async () => performLogin(u, p, c, false, 0))()
+          .finally(() => authStore.set(st => ({ ...st, loginPromise: null })));
+        authStore.set(st => ({ ...st, loginPromise: promise }));
+      } else {
+        log('handleLogin: reuse loginPromise');
+      }
+
+      const ok = await authStore.get().loginPromise;
+      if (!ok) return;
+
+      showData();
+      await loadAllData(false);
+    } finally {
+      setLoading(false);
+      setLoginButtonDisabled(false);
+    }
+  };
+
+  /*****************************************************************
+   * 20) HTML onclick 需要暴露的刷新入口（保持不变）
+   *****************************************************************/
+  window.initCaptcha = async function(forceShow = false, withSpinner = false) {
+    await fetchCaptchaSession({ forceShow, withSpinner });
+  };
+
+  window.loadEcard = async function(refresh = false, withSpinner = true) {
+    await loadEcard(!!refresh, withSpinner !== false);
+  };
+
+  window.loadSchedule = async function(refresh = false, withSpinner = true) {
+    await loadSchedule(!!refresh, withSpinner !== false);
+  };
+
+  /*****************************************************************
+   * 21) 启动策略（严格保留你原逻辑：token 探活 -> autoLogin -> 否则登录页）
+   *****************************************************************/
+  async function bootstrapWithToken() {
+    group('bootstrapWithToken()', () => {});
+    const sv = uiStore.get().sessionVersion;
+    const av = authStore.get().authVersion;
+
+    try {
+      const json = await apiFetchJson('/api/user', { retry: true });
+      if (sv !== uiStore.get().sessionVersion || av !== authStore.get().authVersion) {
+        warn('bootstrapWithToken: stale response ignored');
         return false;
       }
 
-      log('autoLoginOnLoad start...');
-      setLoading(true);
-      try {
-        const ok = await ensureRelogin('AUTO_ON_LOAD');
-        if (!ok) {
-          log('autoLoginOnLoad failed');
-          return false;
-        }
+      showData();
+      renderUser(json.data);
+      panelLoaded.user = true;
 
-        showData();
-        await loadAllData(false);
-        log('autoLoginOnLoad success');
-        return true;
-      } finally {
-        setLoading(false);
+      await Promise.all([
+        loadEcard(false, false),
+        loadSchedule(false, false),
+      ]);
+
+      return true;
+    } catch (e) {
+      warn('bootstrapWithToken failed', e);
+
+      if (authStore.get().requireCaptcha) {
+        alert('自动登录需要验证码，请在登录页输入验证码后登录');
+        await window.handleLogout(true, true);
+        return false;
       }
+
+      alert('登录已过期，请重新登录');
+      await window.handleLogout(true, false);
+      return false;
+    }
+  }
+
+  async function autoLoginOnLoad() {
+    if (autoLoginAttempted) return false;
+    autoLoginAttempted = true;
+
+    const saved = await getSavedCredentials();
+    if (!saved || !saved.username || !saved.password || saved.remember !== true) {
+      log('autoLoginOnLoad skipped', { hasSaved: !!saved, remember: saved?.remember });
+      return false;
     }
 
-    async function saveCredentialsIfNeeded(username, password) {
-      const remember = document.getElementById('rememberMe').checked;
-      if (remember) {
-        const payload = { username, password, remember: true };
-        saveCredentialsLocal(payload);
-        await saveCredentialsIndexedDB(payload);
-      } else {
-        clearCredentialsLocal();
-        await clearCredentialsIndexedDB();
+    log('autoLoginOnLoad start...');
+    setLoading(true);
+    try {
+      const ok = await ensureRelogin('AUTO_ON_LOAD');
+      if (!ok) {
+        log('autoLoginOnLoad failed');
+        return false;
       }
-    }
 
-    function readCredentialsLocal() {
-      for (const key of SAVED_CRED_KEYS) {
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed && (parsed.username || parsed.password)) return parsed;
-        } catch (e) {}
+      showData();
+      await loadAllData(false);
+      log('autoLoginOnLoad success');
+      return true;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function appStart() {
+    group('appStart()', () => {
+      log('initial', { hasToken: hasToken(), authVersion: authStore.get().authVersion, sessionVersion: uiStore.get().sessionVersion });
+    });
+
+    setLoading(true);
+    try {
+      await loadSavedCredentialsToUI();
+
+      if (hasToken()) {
+        const ok = await bootstrapWithToken();
+        if (ok) return;
       }
-      return null;
-    }
 
-    function saveCredentialsLocal(payload) {
-      try {
-        const data = JSON.stringify(payload);
-        SAVED_CRED_KEYS.forEach(k => localStorage.setItem(k, data));
-      } catch (e) {}
-    }
+      const autoOk = await autoLoginOnLoad();
+      if (autoOk) return;
 
-    function clearCredentialsLocal() {
-      SAVED_CRED_KEYS.forEach(k => localStorage.removeItem(k));
+      showLogin();
+      log('appStart: stay on login');
+    } finally {
+      setLoading(false);
     }
+  }
 
-    function openCredDB() {
-      return new Promise((resolve) => {
-        if (!('indexedDB' in window)) return resolve(null);
-        const req = indexedDB.open(IDB_CONFIG.name, 1);
-        req.onupgradeneeded = () => {
-          const db = req.result;
-          if (!db.objectStoreNames.contains(IDB_CONFIG.store)) db.createObjectStore(IDB_CONFIG.store);
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => resolve(null);
-      });
-    }
+  /*****************************************************************
+   * 22) 入口：不再主动拉验证码（按需）
+   *****************************************************************/
+  appStart();
 
-    async function saveCredentialsIndexedDB(payload) {
-      const db = await openCredDB();
-      if (!db) return false;
-      return new Promise((resolve) => {
-        const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
-        tx.objectStore(IDB_CONFIG.store).put(payload, IDB_CONFIG.key);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-      });
-    }
+})();
+</script>
 
-    async function loadCredentialsIndexedDB() {
-      const db = await openCredDB();
-      if (!db) return null;
-      return new Promise((resolve) => {
-        const tx = db.transaction(IDB_CONFIG.store, 'readonly');
-        const req = tx.objectStore(IDB_CONFIG.store).get(IDB_CONFIG.key);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => resolve(null);
-      });
-    }
-
-    async function clearCredentialsIndexedDB() {
-      const db = await openCredDB();
-      if (!db) return false;
-      return new Promise((resolve) => {
-        const tx = db.transaction(IDB_CONFIG.store, 'readwrite');
-        tx.objectStore(IDB_CONFIG.store).delete(IDB_CONFIG.key);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-      });
-    }
-
-    async function getSavedCredentials() {
-      try {
-        const local = readCredentialsLocal();
-        if (local) return local;
-        const idb = await loadCredentialsIndexedDB();
-        return idb || null;
-      } catch {
-        return null;
-      }
-    }
-
-    /***********************
-     * 16) 入口：不再 initCaptcha（按需）
-     ***********************/
-    appStart();
-  </script>
 </body>
 </html>

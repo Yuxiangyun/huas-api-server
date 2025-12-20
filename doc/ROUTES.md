@@ -2,13 +2,27 @@
 
 ## 路由概览
 
-系统采用模块化路由设计，按功能分为三大模块：
+系统采用模块化路由设计，主服务端口包含认证/业务/系统/代理/静态：
 
 ```
 /
+├── /health          # 根路径健康检查
 ├── /auth/*          # 认证模块
 ├── /api/*           # 业务模块
-└── /system/*        # 系统模块
+├── /system/*        # 系统模块
+├── /cas/*           # 代理 CAS
+├── /jsxsd/*         # 代理教务
+├── /portalApi/*     # 代理门户
+├── /personal/*      # 代理个人中心
+└── /                # 静态首页（index.html）
+```
+
+监控服务运行在独立端口（`MONITOR_PORT`），提供：
+
+```
+/metrics.json    # 性能指标
+/status.json     # 指标 + 统计 + 健康
+/dashboard       # 监控面板
 ```
 
 ---
@@ -17,14 +31,14 @@
 
 **路径前缀**: `/auth`  
 **文件位置**: `src/routes/auth.routes.ts`  
-**依赖服务**: `StudentService`
+**依赖服务**: `StudentService` / `HuasClient`
 
 ### 1.1 路由列表
 
 | 方法 | 路径 | 功能 | 速率限制 |
 |------|------|------|---------|
-| GET | /auth/captcha | 获取验证码 | 20/分钟 |
-| POST | /auth/login | 用户登录 | 10/分钟 |
+| GET | /auth/captcha | 获取验证码 | 20/分钟（按 IP） |
+| POST | /auth/login | 用户登录 | 10/分钟（按 IP） |
 | POST | /auth/logout | 退出登录 | 无 |
 
 ### 1.2 实现细节
@@ -35,33 +49,37 @@
 /**
  * 功能流程:
  * 1. 生成 UUID Token
- * 2. 调用 StudentService.getCaptcha()
+ * 2. 调用 HuasClient 获取验证码
  * 3. 创建临时会话（SessionRepo.createTemp）
  * 4. 返回 sessionId 和验证码图片
  */
-app.get('/auth/captcha', async (c) => {
-    // 速率限制检查
-    const clientIP = c.get('clientIP');
-    if (!checkRateLimit(`captcha:${clientIP}`, CAPTCHA_RATE_LIMIT)) {
-        return c.json({ code: 429, msg: "请求过于频繁" }, 429);
+app.get('/auth/captcha',
+    createRateLimitMiddleware('captcha', SECURITY_CONFIG.CAPTCHA_RATE_LIMIT),
+    async (c) => {
+        const clientIP = c.get('clientIP');
+        const userAgent = c.req.header('user-agent') || 'unknown';
+        const sessionId = uuidv4();
+
+        const { HuasClient } = await import('../core/HuasClient');
+        const client = new HuasClient(sessionId);
+        await client.prepareLogin();
+        const img = await client.getCaptcha();
+
+        const state = client.exportState();
+        sessionRepo.createTemp(sessionId, state.cookies, state.execution || '', userAgent, clientIP);
+
+        return c.json({
+            code: 200,
+            data: { sessionId, image: Buffer.from(img).toString('base64') }
+        });
     }
-    
-    // 生成会话并获取验证码
-    const sessionId = uuidv4();
-    const service = new StudentService(sessionId);
-    const { image } = await service.getCaptcha();
-    
-    return c.json({
-        code: 200,
-        data: { sessionId, image }
-    });
-});
+);
 ```
 
 **关键逻辑**:
-- IP 级别速率限制
+- 通过 `createRateLimitMiddleware` 做 IP 级速率限制
 - 自动创建临时会话（存储 cookies 和 execution）
-- Base64 格式返回验证码
+- Base64 字符串返回验证码（客户端可自行拼接 data URL）
 
 ---
 
@@ -75,37 +93,38 @@ app.get('/auth/captcha', async (c) => {
  * 3. 绑定学号到会话（SessionRepo.bindUser）
  * 4. 返回 Token
  */
-app.post('/auth/login', async (c) => {
-    // 参数验证
-    const params = await c.req.json();
-    const validation = validateLoginParams(params);
-    if (!validation.valid) {
-        return c.json({ code: 400, msg: validation.error }, 400);
+app.post('/auth/login',
+    createRateLimitMiddleware('login', SECURITY_CONFIG.LOGIN_RATE_LIMIT),
+    async (c) => {
+        let params;
+        try {
+            params = await c.req.json();
+        } catch {
+            return c.json({ code: 400, msg: "请求格式错误" }, 400);
+        }
+
+        const validation = validateLoginParams(params);
+        if (!validation.valid) {
+            return c.json({ code: 400, msg: validation.error }, 400);
+        }
+
+        const { sessionId, username, password, code } = params;
+        const service = new StudentService(sessionId);
+        const result = await service.login(username, password, code || '');
+
+        if (result.success) {
+            return c.json({ code: 200, msg: "登录成功", token: sessionId });
+        }
+        if (result.needCaptcha) {
+            return c.json({
+                code: 401,
+                msg: "登录失败：学号或密码可能错误，请输入验证码后再试",
+                action: "NEED_CAPTCHA"
+            });
+        }
+        return c.json({ code: 401, msg: "学号、密码或验证码错误" });
     }
-    
-    // 速率限制
-    const clientIP = c.get('clientIP');
-    if (!checkRateLimit(`login:${clientIP}`, LOGIN_RATE_LIMIT)) {
-        return c.json({ code: 429, msg: "请求过于频繁" }, 429);
-    }
-    
-    // 执行登录
-    const service = new StudentService(sessionId);
-    const success = await service.login(username, password, code);
-    
-    if (success) {
-        return c.json({ 
-            code: 200, 
-            msg: "登录成功", 
-            token: sessionId 
-        });
-    } else {
-        return c.json({ 
-            code: 401, 
-            msg: "学号、密码或验证码错误" 
-        });
-    }
-});
+);
 ```
 
 **关键逻辑**:
@@ -113,6 +132,7 @@ app.post('/auth/login', async (c) => {
 - IP + 时间窗口的速率限制
 - 登录成功后更新会话状态（临时 → 活跃）
 - 同时更新 users 表的 last_active_at
+- CAS 提示需要验证码时返回 `action: NEED_CAPTCHA`
 
 ---
 
@@ -153,8 +173,8 @@ app.post('/auth/logout', async (c) => {
 
 | 方法 | 路径 | 功能 | 缓存策略 | 强制刷新 |
 |------|------|------|---------|---------|
-| GET | /api/grades | 获取成绩单 | 12 小时 | ✅ |
-| GET | /api/schedule | 获取课表 | 动态TTL（周一过期） | ✅ |
+| GET | /api/grades | 获取成绩单 | 当前无缓存 | 保留参数 |
+| GET | /api/schedule | 获取课表 | 当前无缓存 | 保留参数 |
 | GET | /api/ecard | 获取一卡通 | 无缓存 | ❌ |
 | GET | /api/user | 获取用户信息 | 30天 | ✅ |
 
@@ -169,34 +189,34 @@ app.post('/auth/logout', async (c) => {
  */
 async function authMiddleware(c, next) {
     const token = c.req.header('Authorization');
-    
+
     // 1. Token 格式验证
     if (!token || !isValidTokenFormat(token)) {
         return c.json({ code: 401, msg: "Token 无效" }, 401);
     }
-    
+
     // 2. 会话查询
     const session = sessionRepo.get(token);
-    if (!session || !session.student_id) {
-        return c.json({ code: 401, msg: "请先登录" }, 401);
+    if (!session) {
+        return c.json({ code: 401, msg: "会话已过期，请重新登录" }, 401);
     }
-    
-    // 3. 速率限制
-    const userId = session.student_id;
-    if (!checkRateLimit(`api:${userId}`, API_RATE_LIMIT)) {
+
+    // 3. 速率限制（按客户端 IP）
+    const clientIP = c.get('clientIP');
+    if (!checkRateLimit(`api:${clientIP}`, API_RATE_LIMIT)) {
         return c.json({ code: 429, msg: "请求过于频繁" }, 429);
     }
-    
-    // 4. 设置上下文
-    c.set('userId', userId);
+
+    // 4. 设置上下文：存放 token，由服务层再解析学号
+    c.set('userId', token);
     await next();
 }
 ```
 
 **关键检查**:
 - Token 格式（UUID v4）
-- 会话是否存在且已登录
-- 用户级别速率限制
+- 会话是否存在
+- 客户端 IP 速率限制
 
 ---
 
@@ -207,10 +227,9 @@ async function authMiddleware(c, next) {
 ```typescript
 /**
  * 功能流程:
- * 1. 检查缓存（基于本周一零点）
- * 2. 缓存命中直接返回
- * 3. 缓存未命中则从学校获取
- * 4. 保存缓存并返回
+ * 1. 校验会话
+ * 2. 直接从学校获取课表（当前禁用缓存）
+ * 3. 返回数据与来源
  */
 app.get('/api/schedule', authMiddleware, async (c) => {
     const token = c.req.header('Authorization')!;
@@ -223,28 +242,48 @@ app.get('/api/schedule', authMiddleware, async (c) => {
         code: 200,
         data: {
             ...result.data,
-            _source: result.source  // 'cache' 或 'network'
+            _source: result.source  // 当前为 'network'
         }
     });
 });
 ```
 
-**缓存逻辑**:
-```typescript
-// 判断是否过期
-const thisMonday = getThisMonday();  // 本周一 00:00
-const isExpired = updatedAt < thisMonday;
+**缓存说明**:
+- 课表当前禁用缓存，`refresh` 参数保留
+**错误处理**:
+- 会话失效 → 返回 401，携带 `action: RELOGIN`
+- 学校系统异常 → 返回 500
 
-// 如果未过期且不强制刷新，返回缓存
-if (!isExpired && !forceRefresh) {
-    return cachedData;
-}
+---
+
+#### GET /api/grades
+
+```typescript
+/**
+ * 功能流程:
+ * 1. 校验会话
+ * 2. 直接从学校获取成绩（当前禁用缓存）
+ * 3. 返回数据与来源
+ */
+app.get('/api/grades', authMiddleware, async (c) => {
+    const token = c.req.header('Authorization')!;
+    const refresh = c.req.query('refresh') === 'true';
+    
+    const service = new StudentService(token);
+    const result = await service.getGrades(refresh);
+    
+    return c.json({
+        code: 200,
+        data: {
+            ...result.data,
+            _source: result.source
+        }
+    });
+});
 ```
 
-**错误处理**:
-- Cookie 失效 → 返回 401，删除会话
-- 学校系统异常 → 返回 500
-- 解析失败 → 返回 500
+**缓存说明**:
+- 成绩当前禁用缓存，`refresh` 参数保留
 
 ---
 
@@ -315,7 +354,7 @@ app.get('/api/user', authMiddleware, async (c) => {
 
 ## 3. 系统路由 (system.routes.ts)
 
-**路径前缀**: `/system`  
+**路径前缀**: `/system`（另含 `/health`）  
 **文件位置**: `src/routes/system.routes.ts`  
 **依赖服务**: `StatsRepo`
 
@@ -324,13 +363,31 @@ app.get('/api/user', authMiddleware, async (c) => {
 | 方法 | 路径 | 功能 | 鉴权 |
 |------|------|------|------|
 | GET | /system/health | 健康检查 | ❌ |
-| GET | /system/stats | 系统统计 | ❌ |
-| GET | /system/stats/users | 用户统计 | ❌ |
-| GET | /system/stats/sessions | 会话统计 | ❌ |
-| GET | /system/stats/cache | 缓存统计 | ❌ |
-| GET | /system/stats/active-users | 活跃排行 | ❌ |
+| GET | /system/stats | 系统统计 | 🔒 管理员 |
+| GET | /system/stats/users | 用户统计 | 🔒 管理员 |
+| GET | /system/stats/sessions | 会话统计 | 🔒 管理员 |
+| GET | /system/stats/cache | 缓存统计 | 🔒 管理员 |
+| GET | /system/stats/active-users | 活跃排行 | 🔒 管理员 |
 
 ### 3.2 实现细节
+
+#### GET /health
+
+```typescript
+/**
+ * 根路径健康检查
+ * 用于负载均衡器/探针
+ */
+app.get('/health', (c) => {
+    return c.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+```
+
+---
 
 #### GET /system/health
 
@@ -358,12 +415,22 @@ app.get('/system/health', (c) => {
 
 ---
 
+#### 管理员鉴权中间件
+
+```typescript
+// 所有 /system/stats/* 路由需要管理员权限
+app.use('/system/stats/*', createAdminAuthMiddleware());
+```
+
+---
+
 #### GET /system/stats
 
 ```typescript
 /**
  * 系统完整统计
  * 返回用户、会话、缓存的全量统计数据
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats', (c) => {
     const stats = statsRepo.getSystemStats();
@@ -383,9 +450,9 @@ app.get('/system/stats', (c) => {
     "activeUsersToday": 85,
     "activeUsersWeek": 320,
     "activeUsersMonth": 890,
-    "newUsersToday": 0,     // 待实现
-    "newUsersWeek": 0,      // 待实现
-    "newUsersMonth": 0      // 待实现
+    "newUsersToday": 5,
+    "newUsersWeek": 32,
+    "newUsersMonth": 128
   },
   "session": {
     "totalSessions": 1580,
@@ -396,6 +463,7 @@ app.get('/system/stats', (c) => {
   "cache": {
     "totalCacheRecords": 3750,
     "scheduleCache": 1250,
+    "gradeCache": 1250,
     "ecardCache": 1250,
     "userInfoCache": 1250
   },
@@ -411,6 +479,7 @@ app.get('/system/stats', (c) => {
 /**
  * 用户维度统计
  * 基于 users 表的 last_active_at 字段
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats/users', (c) => {
     const stats = statsRepo.getUserStats();
@@ -441,6 +510,7 @@ WHERE last_active_at >= ?  -- 30天前
 /**
  * 会话维度统计
  * 分析会话状态分布
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats/sessions', (c) => {
     const stats = statsRepo.getSessionStats();
@@ -462,6 +532,7 @@ app.get('/system/stats/sessions', (c) => {
 /**
  * 缓存维度统计
  * 按类型统计缓存记录数
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats/cache', (c) => {
     const stats = statsRepo.getCacheStats();
@@ -473,6 +544,9 @@ app.get('/system/stats/cache', (c) => {
 ```sql
 -- 课表缓存数
 SELECT COUNT(*) FROM data_cache WHERE type = 'SCHEDULE'
+
+-- 成绩缓存数
+SELECT COUNT(*) FROM data_cache WHERE type = 'GRADES'
 
 -- 一卡通缓存数
 SELECT COUNT(*) FROM data_cache WHERE type = 'ECARD'
@@ -489,6 +563,7 @@ SELECT COUNT(*) FROM data_cache WHERE type = 'USER_INFO'
 /**
  * 活跃用户排行榜
  * 按最后活跃时间降序排列
+ * 🔒 需要管理员权限
  */
 app.get('/system/stats/active-users', (c) => {
     const limit = parseInt(c.req.query('limit') || '10');
@@ -547,10 +622,13 @@ app.use('*', createPerformanceMiddleware());
 registerApiRoutes(app);      // /api/*
 registerAuthRoutes(app);     // /auth/*
 
-// 3. 系统路由
-app.route('/', systemRoutes); // /system/*
+// 3. 代理路由（上游透传）
+app.route('/', proxyRoutes);  // /cas/* /jsxsd/* /portalApi/* /personal/*
 
-// 4. 静态资源（兜底）
+// 4. 系统路由
+app.route('/', systemRoutes); // /health + /system/*
+
+// 5. 静态资源（兜底）
 app.get('/', ...);
 ```
 
@@ -588,8 +666,8 @@ app.get('/', ...);
 **认证中间件** (`authMiddleware`):
 1. Token 格式验证
 2. 会话有效性检查
-3. 速率限制检查
-4. 设置上下文变量（userId）
+3. 速率限制检查（按客户端 IP）
+4. 设置上下文变量（token）
 
 ---
 
@@ -600,7 +678,8 @@ app.get('/', ...);
 ```json
 {
   "code": 401,
-  "msg": "错误描述"
+  "msg": "错误描述",
+  "action": "RELOGIN"
 }
 ```
 
@@ -619,9 +698,11 @@ app.get('/', ...);
 ```typescript
 catch (e) {
     if (e instanceof SessionExpiredError) {
-        // 自动删除会话
-        sessionRepo.delete(token);
-        return c.json({ code: 401, msg: "请先登录" }, 401);
+        return c.json({
+            code: 401,
+            msg: "登录凭证已失效，请重新登录",
+            action: "RELOGIN"
+        }, 401);
     }
 }
 ```
@@ -670,7 +751,7 @@ describe('Auth Routes', () => {
         expect(res.status).toBe(200);
         const json = await res.json();
         expect(json.data.sessionId).toBeDefined();
-        expect(json.data.image).toMatch(/^data:image/);
+        expect(json.data.image).toBeTruthy();
     });
 });
 ```
@@ -704,8 +785,8 @@ test('完整登录流程', async () => {
 ## 10. 性能优化建议
 
 ### 10.1 缓存优化
-- ✅ 课表使用智能 TTL（周一过期）
 - ✅ 用户信息长期缓存（30天）
+- ⚠️ 课表/成绩当前禁用缓存（默认实时）
 - ❌ 一卡通无缓存（实时性要求）
 
 ### 10.2 数据库优化
@@ -731,17 +812,19 @@ test('完整登录流程', async () => {
 └── POST /auth/logout        退出登录
 
 业务
+├── GET  /api/grades         获取成绩单
 ├── GET  /api/schedule       获取课表
 ├── GET  /api/ecard          获取一卡通
 └── GET  /api/user           获取用户信息
 
 系统
+├── GET  /health                        健康检查（根路径）
 ├── GET  /system/health                 健康检查
-├── GET  /system/stats                  系统统计
-├── GET  /system/stats/users            用户统计
-├── GET  /system/stats/sessions         会话统计
-├── GET  /system/stats/cache            缓存统计
-└── GET  /system/stats/active-users     活跃排行
+├── GET  /system/stats                  系统统计（管理员）
+├── GET  /system/stats/users            用户统计（管理员）
+├── GET  /system/stats/sessions         会话统计（管理员）
+├── GET  /system/stats/cache            缓存统计（管理员）
+└── GET  /system/stats/active-users     活跃排行（管理员）
 ```
 
 ### B. 中间件执行顺序
@@ -761,4 +844,5 @@ test('完整登录流程', async () => {
 |------|------|---------|
 | 验证码 | 20/分钟 | CAPTCHA_RATE_LIMIT |
 | 登录 | 10/分钟 | LOGIN_RATE_LIMIT |
-| 业务 API | 60/分钟 | API_RATE_LIMIT |
+| 业务 API | 60/分钟（按 IP） | API_RATE_LIMIT |
+| 管理员 API | 100/分钟（按学号） | 固定值 |

@@ -240,8 +240,8 @@ afterEach(() => {
 #### 4.2.1 GET /api/schedule
 
 **测试目标**：
-- 缓存策略正确（按周一过期）
-- 强制刷新参数生效
+- 当前无缓存（始终 network）
+- `refresh` 参数保留但不影响结果
 - 鉴权正确
 
 **数据集矩阵**：
@@ -252,12 +252,27 @@ afterEach(() => {
 | 鉴权失败 | 非法 token 格式 | 无 | `Authorization: invalid` | 401 |
 | 会话无效 | token 合法但未绑定学号 | session.student_id 为空 | 合法 token | 401 |
 | 无缓存 | 首次请求 | 无 data_cache 记录 | 默认 | 200，`_source: 'network'` |
-| 缓存命中 | 未过期缓存 | data_cache.updated_at >= 本周一 | 默认 | 200，`_source: 'cache'` |
-| 缓存过期 | 已过期缓存 | data_cache.updated_at < 本周一 | 默认 | 200，`_source: 'network'` |
-| 强制刷新 | `refresh=true` | 任何缓存状态 | `refresh=true` | 总是 `_source: 'network'` |
+| refresh 参数 | `refresh=true` | 任意 | `refresh=true` | 200，`_source: 'network'` |
 | 上游异常 | 学校系统错误响应 | 模拟异常 HTML | 默认 | 500，错误日志 |
 
-#### 4.2.2 GET /api/ecard
+#### 4.2.2 GET /api/grades
+
+**测试目标**：
+- 当前无缓存（始终 network）
+- 汇总字段与明细解析正确
+- 鉴权正确
+
+**数据集矩阵**：
+
+| 场景类别 | 场景 | 前置状态 | 请求参数 | 预期结果 |
+|----------|------|----------|----------|----------|
+| 鉴权失败 | 无 token | 无 session | 无 | 401 |
+| 会话无效 | token 合法但未绑定学号 | session.student_id 为空 | 合法 token | 401 |
+| 正常请求 | 成绩正常 | mock 成绩 HTML | 默认 | 200，`summary` 与 `items` 完整 |
+| refresh 参数 | `refresh=true` | 任意 | `refresh=true` | 200，`_source: 'network'` |
+| 上游异常 | 学校系统错误响应 | 模拟异常 HTML | 500，错误日志 |
+
+#### 4.2.3 GET /api/ecard
 
 **测试目标**：
 - 实时数据（不使用缓存）
@@ -273,7 +288,7 @@ afterEach(() => {
 | 状态挂失 | status: '挂失' | 200，状态正确显示 |
 | 上游错误 | code: '500' | 500 或空数据 |
 
-#### 4.2.3 GET /api/user
+#### 4.2.4 GET /api/user
 
 **测试目标**：
 - 缓存策略正确（30天）
@@ -282,19 +297,27 @@ afterEach(() => {
 
 ### 4.3 系统模块 `/system/*`
 
-#### 4.3.1 GET /system/health
+#### 4.3.1 GET /health
 
 **测试目标**：
 - 始终返回 200
 - 包含 status、timestamp、uptime
 - 响应时间 < 500ms
 
-#### 4.3.2 GET /system/stats
+#### 4.3.2 GET /system/health
+
+**测试目标**：
+- 始终返回 200
+- 包含 status、timestamp、uptime
+- 响应时间 < 500ms
+
+#### 4.3.3 GET /system/stats
 
 **测试目标**：
 - 返回结构字段完备
 - 数据类型正确（数字都为非负）
 - 在大量数据时仍能快速响应
+- 管理员权限校验（非管理员返回 403）
 
 ---
 

@@ -9,6 +9,8 @@ yarn.lock
 logs
 backups
 huas.sqlite*
+.env*
+*.sqlite*
 .DS_Store
 deploy
 .vscode
